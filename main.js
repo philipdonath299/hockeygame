@@ -390,15 +390,16 @@ class Game {
             const worldY = this.input.action.current.y + this.camera.y;
             
             this.ctx.beginPath();
-            this.ctx.moveTo(p.pos.x, p.pos.y);
+            this.ctx.moveTo(this.puck.pos.x, this.puck.pos.y);
             this.ctx.lineTo(worldX, worldY);
             
-            // Neon green stroke
+            // Neon green stroke with glow
+            this.ctx.shadowBlur = 10;
+            this.ctx.shadowColor = '#00ff00';
             this.ctx.strokeStyle = '#00ff00';
-            this.ctx.lineWidth = 4;
-            this.ctx.setLineDash([5, 5]);
+            this.ctx.lineWidth = 6;
             this.ctx.stroke();
-            this.ctx.setLineDash([]);
+            this.ctx.shadowBlur = 0;
             
             // Dot at end
             this.ctx.beginPath();
@@ -438,16 +439,18 @@ class Game {
         this.ctx.strokeStyle = '#000';
         this.ctx.lineWidth = 8;
         this.ctx.stroke();
-        
-        // Inner grey fill for base
-        this.ctx.fillStyle = 'rgba(255, 255, 255, 0.2)';
-        this.ctx.fill();
 
-        // Nub (Solid black)
+        // Nub (Gradient black sphere)
         this.ctx.beginPath();
         this.ctx.arc(current.x, current.y, 35, 0, Math.PI * 2);
-        this.ctx.fillStyle = '#111';
+        const grad = this.ctx.createRadialGradient(current.x - 10, current.y - 10, 5, current.x, current.y, 35);
+        grad.addColorStop(0, '#555');
+        grad.addColorStop(1, '#000');
+        this.ctx.fillStyle = grad;
         this.ctx.fill();
+        this.ctx.lineWidth = 2;
+        this.ctx.strokeStyle = '#000';
+        this.ctx.stroke();
         
         // White arrows inside nub
         this.ctx.fillStyle = '#fff';

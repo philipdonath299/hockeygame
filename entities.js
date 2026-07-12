@@ -67,16 +67,18 @@ export class Player extends Entity {
 
         // Stick
         ctx.beginPath();
-        ctx.moveTo(10, 10); // Offset to the side
-        ctx.lineTo(25, 10);
-        ctx.lineTo(30, 15); // Blade
-        ctx.strokeStyle = '#333'; // Stick color
-        ctx.lineWidth = 3;
+        ctx.moveTo(15, 5); // Originating from hands
+        ctx.lineTo(30, 20);
+        ctx.lineTo(35, 15); // Blade
+        ctx.strokeStyle = '#4a3b2c'; // Dark wood
+        ctx.lineWidth = 4;
+        ctx.lineJoin = 'round';
+        ctx.lineCap = 'round';
         ctx.stroke();
 
         // Shoulders
         ctx.beginPath();
-        ctx.roundRect(-8, -14, 16, 28, 6);
+        ctx.roundRect(-12, -16, 24, 32, 8);
         ctx.fillStyle = this.color;
         ctx.fill();
         ctx.lineWidth = 2;
@@ -85,15 +87,23 @@ export class Player extends Entity {
         
         // Helmet
         ctx.beginPath();
-        ctx.arc(0, 0, 8, 0, Math.PI * 2);
-        ctx.fillStyle = this.team === 0 ? '#111' : '#eee';
+        ctx.arc(0, -2, 9, 0, Math.PI * 2);
+        ctx.fillStyle = this.team === 0 ? '#222' : '#fff';
         ctx.fill();
+        ctx.stroke();
+
+        // Helmet stripe
+        ctx.beginPath();
+        ctx.moveTo(0, -11);
+        ctx.lineTo(0, 7);
+        ctx.strokeStyle = this.team === 0 ? '#fff' : '#222';
+        ctx.lineWidth = 3;
         ctx.stroke();
 
         // Number on back
         ctx.rotate(-heading); // Keep text upright
         ctx.fillStyle = this.team === 0 ? '#fff' : '#000';
-        ctx.font = 'bold 10px Oswald';
+        ctx.font = 'bold 11px Oswald';
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
         ctx.fillText(this.id, 0, 0);
@@ -108,19 +118,22 @@ export class Player extends Entity {
             ctx.lineWidth = 4;
             ctx.stroke();
 
-            // Name plate
-            const names = ['EKHOLM', 'ROBERTS', 'GRAND', 'SMITH'];
+            // Name plate background
             const pName = 'J. ' + names[this.id % names.length];
-            
             ctx.font = 'bold 12px Oswald';
             const textWidth = ctx.measureText(pName).width;
+
+            ctx.fillStyle = '#65c2db';
+            ctx.beginPath();
+            ctx.roundRect(this.pos.x - textWidth/2 - 6, this.pos.y + this.radius + 12, textWidth + 12, 16, 4);
+            ctx.fill();
+            ctx.strokeStyle = '#fff';
+            ctx.lineWidth = 1.5;
+            ctx.stroke();
             
-            // Text shadow/outline
+            // Text
             ctx.fillStyle = '#000';
-            ctx.fillText(pName, this.pos.x + 1, this.pos.y + this.radius + 21);
-            
-            ctx.fillStyle = '#fff';
-            ctx.fillText(pName, this.pos.x, this.pos.y + this.radius + 20);
+            ctx.fillText(pName, this.pos.x, this.pos.y + this.radius + 21);
         }
     }
 
@@ -306,13 +319,23 @@ export class Rink {
         ctx.restore();
 
         // Thick Boards border
-        ctx.lineWidth = 12;
-        ctx.strokeStyle = '#f0d800'; // Yellow dash/board edge
+        ctx.lineWidth = 20;
+        ctx.strokeStyle = '#fff'; // White boards base
         ctx.stroke();
-        
-        ctx.lineWidth = 4;
-        ctx.strokeStyle = '#0055a4'; // Blue trim
+        ctx.lineWidth = 8;
+        ctx.strokeStyle = '#0055a4'; // Blue trim on top
         ctx.stroke();
+
+        // Draw Ads on Boards
+        ctx.save();
+        ctx.fillStyle = '#111';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.font = 'bold 16px Oswald';
+        // Clip text to just the top/bottom edges
+        ctx.fillText("BIG IDEA GAMES        SUPERSTAR HOCKEY        BIG IDEA GAMES", cx, -5);
+        ctx.fillText("BIG IDEA GAMES        SUPERSTAR HOCKEY        BIG IDEA GAMES", cx, this.height + 5);
+        ctx.restore();
 
         // Clip all ice markings to not bleed out of the rounded rink
         ctx.save();
@@ -341,34 +364,38 @@ export class Rink {
         // ROCKY MOUNTAIN Logo
         ctx.save();
         ctx.translate(cx, cy);
-        ctx.globalAlpha = 0.5;
-        // Shield
+        ctx.globalAlpha = 0.8;
+        // Shield outline
         ctx.beginPath();
         ctx.moveTo(0, -60);
-        ctx.lineTo(50, -30);
-        ctx.lineTo(50, 40);
+        ctx.lineTo(60, -30);
+        ctx.lineTo(60, 40);
         ctx.lineTo(0, 70);
-        ctx.lineTo(-50, 40);
-        ctx.lineTo(-50, -30);
+        ctx.lineTo(-60, 40);
+        ctx.lineTo(-60, -30);
         ctx.closePath();
         ctx.fillStyle = '#fff';
         ctx.fill();
-        ctx.strokeStyle = '#286090';
-        ctx.lineWidth = 3;
+        ctx.strokeStyle = '#65c2db'; // Icy light blue
+        ctx.lineWidth = 4;
         ctx.stroke();
         // Mountains
-        ctx.fillStyle = '#286090';
+        ctx.fillStyle = '#65c2db';
         ctx.beginPath();
-        ctx.moveTo(-45, 30);
-        ctx.lineTo(-20, -10);
-        ctx.lineTo(0, 10);
-        ctx.lineTo(30, -30);
-        ctx.lineTo(45, 30);
+        ctx.moveTo(-56, 30);
+        ctx.lineTo(-20, -20);
+        ctx.lineTo(0, 5);
+        ctx.lineTo(30, -40);
+        ctx.lineTo(56, 30);
         ctx.fill();
         // Text
-        ctx.fillStyle = '#286090';
-        ctx.font = 'bold 12px Oswald';
+        ctx.fillStyle = '#65c2db';
+        ctx.font = 'bold 16px Oswald';
         ctx.textAlign = 'center';
+        // White outline for text readability
+        ctx.strokeStyle = '#fff';
+        ctx.lineWidth = 3;
+        ctx.strokeText("ROCKY MOUNTAIN", 0, 50);
         ctx.fillText("ROCKY MOUNTAIN", 0, 50);
         ctx.restore();
 
@@ -385,33 +412,45 @@ export class Rink {
 
         // Center circle
         ctx.beginPath();
-        ctx.arc(cx, cy, 80, 0, Math.PI * 2);
+        ctx.arc(cx, cy, 100, 0, Math.PI * 2);
         ctx.strokeStyle = '#286090';
-        ctx.lineWidth = 3;
+        ctx.lineWidth = 4;
         ctx.stroke();
 
-        // Faceoff dots
-        ctx.fillStyle = '#c9302c';
+        // Faceoff dots & circles
         const dots = [
             { x: cx, y: cy },
-            { x: cx - 150, y: cy - 350 }, { x: cx + 150, y: cy - 350 },
-            { x: cx - 150, y: cy + 350 }, { x: cx + 150, y: cy + 350 }
+            { x: cx - 180, y: cy - 400 }, { x: cx + 180, y: cy - 400 },
+            { x: cx - 180, y: cy + 400 }, { x: cx + 180, y: cy + 400 }
         ];
         dots.forEach(d => {
+            // Dot
+            ctx.fillStyle = '#c9302c';
             ctx.beginPath();
             ctx.arc(d.x, d.y, 6, 0, Math.PI * 2);
             ctx.fill();
+            // Circle (only for outer dots)
+            if (d.y !== cy) {
+                ctx.strokeStyle = '#c9302c';
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                ctx.arc(d.x, d.y, 80, 0, Math.PI * 2);
+                ctx.stroke();
+            }
         });
 
-        // Creases
-        ctx.fillStyle = 'rgba(40, 96, 144, 0.3)';
+        // Creases (Light blue fill, red border)
+        ctx.fillStyle = 'rgba(100, 150, 255, 0.2)';
+        ctx.strokeStyle = '#c9302c';
+        ctx.lineWidth = 3;
+        
         ctx.beginPath();
-        ctx.arc(cx, this.goalOffset, 50, 0, Math.PI);
+        ctx.arc(cx, this.goalOffset, 60, 0, Math.PI);
         ctx.fill();
         ctx.stroke();
 
         ctx.beginPath();
-        ctx.arc(cx, this.height - this.goalOffset, 50, Math.PI, Math.PI * 2);
+        ctx.arc(cx, this.height - this.goalOffset, 60, Math.PI, Math.PI * 2);
         ctx.fill();
         ctx.stroke();
         
