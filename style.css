@@ -1,8 +1,4 @@
-*, *::before, *::after {
-    box-sizing: border-box;
-    margin: 0;
-    padding: 0;
-}
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
 html, body {
     position: fixed;
@@ -10,15 +6,15 @@ html, body {
     width: 100%;
     height: 100%;
     overflow: hidden;
-    background: #0d0d14;
-    font-family: 'Oswald', sans-serif;
+    background: #0a0a16;
+    font-family: 'Oswald', 'Arial Narrow', sans-serif;
     touch-action: none;
     overscroll-behavior: none;
+    -webkit-tap-highlight-color: transparent;
     user-select: none;
     -webkit-user-select: none;
 }
 
-/* ── Canvas fills the screen ── */
 #game-canvas {
     display: block;
     width: 100%;
@@ -27,7 +23,7 @@ html, body {
     image-rendering: crisp-edges;
 }
 
-/* ── UI layer sits on top ── */
+/* ── UI layer ── */
 #ui-layer {
     position: absolute;
     inset: 0;
@@ -37,14 +33,13 @@ html, body {
 /* ── Scoreboard ── */
 #scoreboard {
     position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
+    top: 0; left: 0; right: 0;
     display: flex;
-    align-items: center;
+    align-items: stretch;
     justify-content: space-between;
-    padding: 6px 10px;
-    background: linear-gradient(180deg, rgba(0,0,0,0.75) 0%, transparent 100%);
+    height: 58px;
+    padding: 0 10px;
+    background: linear-gradient(180deg, rgba(0,0,0,0.82) 70%, transparent);
     pointer-events: all;
 }
 
@@ -52,104 +47,110 @@ html, body {
     display: flex;
     flex-direction: column;
     align-items: center;
-    min-width: 70px;
+    justify-content: center;
+    min-width: 80px;
+    gap: 1px;
 }
 
 .team-name {
     font-size: 10px;
     font-weight: 700;
-    letter-spacing: 1.5px;
-    color: #aaa;
+    letter-spacing: 2px;
+    color: rgba(255,255,255,0.55);
     text-transform: uppercase;
 }
 
 .team-score {
-    font-size: 34px;
+    font-size: 32px;
     font-weight: 900;
     line-height: 1;
-    color: #fff;
-    text-shadow: 0 0 12px currentColor;
+    letter-spacing: -1px;
 }
 
-.team-red  .team-score { color: #e74c3c; }
-.team-blue .team-score { color: #3498db; }
+.team-red  .team-score { color: #e74c3c; text-shadow: 0 0 16px rgba(231,76,60,0.8); }
+.team-blue .team-score { color: #3498db; text-shadow: 0 0 16px rgba(52,152,219,0.8); }
 
 .shots {
     display: flex;
     gap: 4px;
     font-size: 9px;
-    color: #888;
-    margin-top: 2px;
+    color: rgba(255,255,255,0.4);
+    letter-spacing: 0.5px;
 }
 
-/* ── Clock ── */
+/* ── Center clock ── */
 .time-container {
     display: flex;
     flex-direction: column;
     align-items: center;
+    justify-content: center;
+    gap: 1px;
 }
 
 .clock {
-    font-size: 22px;
+    font-size: 20px;
     font-weight: 700;
     color: #fff;
     letter-spacing: 2px;
+    font-variant-numeric: tabular-nums;
 }
 
 .period {
     font-size: 9px;
-    color: #aaa;
-    letter-spacing: 1px;
+    color: rgba(255,255,255,0.45);
+    letter-spacing: 2px;
+    text-transform: uppercase;
 }
 
 /* ── Pause button ── */
 .pause-btn {
     position: absolute;
-    right: 10px;
+    right: 8px;
     top: 50%;
     transform: translateY(-50%);
     display: flex;
     gap: 3px;
-    padding: 6px;
+    padding: 8px 6px;
     cursor: pointer;
+    pointer-events: all;
 }
 
 .bar {
     width: 4px;
     height: 16px;
-    background: #fff;
+    background: rgba(255,255,255,0.65);
     border-radius: 2px;
-    opacity: 0.7;
 }
 
-/* ── Goal overlay ── */
+/* ── Goal / Game Over overlay ── */
 #goal-overlay {
     position: absolute;
     inset: 0;
     display: flex;
+    flex-direction: column;
     align-items: center;
     justify-content: center;
-    background: rgba(0,0,0,0.5);
+    background: rgba(0,0,0,0.48);
+    backdrop-filter: blur(3px);
+    -webkit-backdrop-filter: blur(3px);
     pointer-events: none;
-    transition: opacity 0.3s;
+    transition: opacity 0.25s;
 }
 
-#goal-overlay.hidden {
-    display: none;
-}
+#goal-overlay.hidden { display: none; }
 
 .goal-text {
-    font-size: 56px;
+    font-size: 52px;
     font-weight: 900;
     color: #fff;
-    text-shadow: 0 0 30px #f39c12, 0 0 60px #f39c12;
-    letter-spacing: 4px;
-    animation: goalPulse 0.6s ease-in-out infinite alternate;
+    text-shadow: 0 0 40px currentColor, 0 2px 0 rgba(0,0,0,0.5);
+    letter-spacing: 3px;
+    animation: goalPulse 0.55s ease-in-out infinite alternate;
+    text-align: center;
+    padding: 0 20px;
 }
 
 @keyframes goalPulse {
     from { transform: scale(1);    opacity: 1; }
-    to   { transform: scale(1.08); opacity: 0.85; }
+    to   { transform: scale(1.07); opacity: 0.88; }
 }
-
-@import url('https://fonts.googleapis.com/css2?family=Oswald:wght@400;700;900&display=swap');
