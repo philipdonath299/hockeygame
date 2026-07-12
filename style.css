@@ -16,6 +16,7 @@ body, html {
     background-color: #111;
     font-family: 'Oswald', sans-serif;
     touch-action: none; /* Prevent all browser default touch actions */
+    overscroll-behavior: none; /* Prevent scroll bouncing on iOS */
 }
 
 #game-canvas {

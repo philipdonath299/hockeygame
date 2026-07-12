@@ -387,3 +387,28 @@ class Game {
 window.onload = () => {
     new Game();
 };
+
+// Global iOS zoom and gesture prevention
+document.addEventListener('gesturestart', function (e) {
+    e.preventDefault();
+});
+document.addEventListener('gesturechange', function (e) {
+    e.preventDefault();
+});
+document.addEventListener('gestureend', function (e) {
+    e.preventDefault();
+});
+
+let lastTouchEnd = 0;
+document.addEventListener('touchend', function (e) {
+    const now = (new Date()).getTime();
+    if (now - lastTouchEnd <= 300) {
+        e.preventDefault();
+    }
+    lastTouchEnd = now;
+}, { passive: false });
+
+// Prevent pull-to-refresh
+document.body.addEventListener('touchmove', function(e) { 
+    e.preventDefault(); 
+}, { passive: false });
