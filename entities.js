@@ -1,5 +1,19 @@
 import { Vector, Collision } from './physics.js';
 
+function drawRoundRect(ctx, x, y, width, height, radius) {
+    ctx.beginPath();
+    ctx.moveTo(x + radius, y);
+    ctx.lineTo(x + width - radius, y);
+    ctx.quadraticCurveTo(x + width, y, x + width, y + radius);
+    ctx.lineTo(x + width, y + height - radius);
+    ctx.quadraticCurveTo(x + width, y + height, x + width - radius, y + height);
+    ctx.lineTo(x + radius, y + height);
+    ctx.quadraticCurveTo(x, y + height, x, y + height - radius);
+    ctx.lineTo(x, y + radius);
+    ctx.quadraticCurveTo(x, y, x + radius, y);
+    ctx.closePath();
+}
+
 export class Entity {
     constructor(x, y, radius, mass) {
         this.pos = { x, y };
@@ -77,8 +91,7 @@ export class Player extends Entity {
         ctx.stroke();
 
         // Shoulders
-        ctx.beginPath();
-        this.drawRoundRect(ctx, -12, -16, 24, 32, 8);
+        drawRoundRect(ctx, -12, -16, 24, 32, 8);
         ctx.fillStyle = this.color;
         ctx.fill();
         ctx.lineWidth = 2;
@@ -124,8 +137,7 @@ export class Player extends Entity {
             const textWidth = ctx.measureText(pName).width;
 
             ctx.fillStyle = '#65c2db';
-            ctx.beginPath();
-            this.drawRoundRect(ctx, this.pos.x - textWidth/2 - 6, this.pos.y + this.radius + 12, textWidth + 12, 16, 4);
+            drawRoundRect(ctx, this.pos.x - textWidth/2 - 6, this.pos.y + this.radius + 12, textWidth + 12, 16, 4);
             ctx.fill();
             ctx.strokeStyle = '#fff';
             ctx.lineWidth = 1.5;
@@ -274,17 +286,13 @@ export class Rink {
         ctx.strokeStyle = '#333';
         ctx.lineWidth = 10;
         for (let i = 0; i < 20; i++) {
-            ctx.beginPath();
-            this.drawRoundRect(ctx, -200 - i * 50, -200 - i * 50, this.width + 400 + i * 100, this.height + 400 + i * 100, this.boardsRadius + 100 + i * 50);
+            drawRoundRect(ctx, -200 - i * 50, -200 - i * 50, this.width + 400 + i * 100, this.height + 400 + i * 100, this.boardsRadius + 100 + i * 50);
             ctx.stroke();
         }
 
         // Draw the rounded rink
         const r = this.boardsRadius;
-        ctx.beginPath();
-        this.drawRoundRect(ctx, 0, 0, this.width, this.height, r);
-        ctx.closePath();
-
+        drawRoundRect(ctx, 0, 0, this.width, this.height, r);
         ctx.fillStyle = '#eaf5fa'; // Ice color
         ctx.fill();
         
@@ -481,18 +489,5 @@ export class Rink {
 
         drawGoal(this.goalOffset, 1); // Top
         drawGoal(this.height - this.goalOffset, -1); // Bottom
-    }
-
-    drawRoundRect(ctx, x, y, width, height, radius) {
-        ctx.moveTo(x + radius, y);
-        ctx.lineTo(x + width - radius, y);
-        ctx.quadraticCurveTo(x + width, y, x + width, y + radius);
-        ctx.lineTo(x + width, y + height - radius);
-        ctx.quadraticCurveTo(x + width, y + height, x + width - radius, y + height);
-        ctx.lineTo(x + radius, y + height);
-        ctx.quadraticCurveTo(x, y + height, x, y + height - radius);
-        ctx.lineTo(x, y + radius);
-        ctx.quadraticCurveTo(x, y, x + radius, y);
-        ctx.closePath();
     }
 }
