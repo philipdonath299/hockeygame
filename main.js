@@ -380,29 +380,94 @@ class Game {
             p.render(this.ctx, i === this.controlledPlayerIndex);
         });
 
+        // Draw Aiming Line (Green cone)
+        if (this.input.action.touchId !== null && this.controlledPlayerIndex !== -1 && this.players[this.controlledPlayerIndex].hasPuck) {
+            const p = this.players[this.controlledPlayerIndex];
+            const worldX = this.input.action.current.x + this.camera.x;
+            const worldY = this.input.action.current.y + this.camera.y;
+            
+            this.ctx.beginPath();
+            this.ctx.moveTo(p.pos.x, p.pos.y);
+            this.ctx.lineTo(worldX, worldY);
+            
+            // Neon green stroke
+            this.ctx.strokeStyle = '#00ff00';
+            this.ctx.lineWidth = 4;
+            this.ctx.setLineDash([5, 5]);
+            this.ctx.stroke();
+            this.ctx.setLineDash([]);
+            
+            // Dot at end
+            this.ctx.beginPath();
+            this.ctx.arc(worldX, worldY, 8, 0, Math.PI * 2);
+            this.ctx.fillStyle = '#00ff00';
+            this.ctx.fill();
+            this.ctx.strokeStyle = '#000';
+            this.ctx.lineWidth = 2;
+            this.ctx.stroke();
+        }
+
         this.ctx.restore();
         
         this.renderVirtualJoystick();
     }
 
     renderVirtualJoystick() {
+        const thresholdY = this.height * (1 - this.input.joystickZoneHeight);
+
+        // Grey action zone box
+        this.ctx.save();
+        this.ctx.fillStyle = 'rgba(0, 0, 0, 0.1)';
+        this.ctx.fillRect(40, thresholdY + 20, this.width - 80, this.height - thresholdY - 40);
+        this.ctx.strokeStyle = 'rgba(0, 0, 0, 0.2)';
+        this.ctx.lineWidth = 2;
+        this.ctx.strokeRect(40, thresholdY + 20, this.width - 80, this.height - thresholdY - 40);
+        this.ctx.restore();
+
         if (!this.input.joystick.active) return;
 
         const { origin, current } = this.input.joystick;
         
         this.ctx.save();
-        // Base ring
+        // Base ring (Thick black)
         this.ctx.beginPath();
-        this.ctx.arc(origin.x, origin.y, 50, 0, Math.PI * 2);
-        this.ctx.strokeStyle = 'rgba(0, 0, 0, 0.3)';
-        this.ctx.lineWidth = 4;
+        this.ctx.arc(origin.x, origin.y, 60, 0, Math.PI * 2);
+        this.ctx.strokeStyle = '#000';
+        this.ctx.lineWidth = 8;
         this.ctx.stroke();
-
-        // Nub
-        this.ctx.beginPath();
-        this.ctx.arc(current.x, current.y, 20, 0, Math.PI * 2);
-        this.ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
+        
+        // Inner grey fill for base
+        this.ctx.fillStyle = 'rgba(255, 255, 255, 0.2)';
         this.ctx.fill();
+
+        // Nub (Solid black)
+        this.ctx.beginPath();
+        this.ctx.arc(current.x, current.y, 35, 0, Math.PI * 2);
+        this.ctx.fillStyle = '#111';
+        this.ctx.fill();
+        
+        // White arrows inside nub
+        this.ctx.fillStyle = '#fff';
+        const d = 20; // Distance from center
+        const s = 4;  // Size of triangle
+        const drawArrow = (x, y, rot) => {
+            this.ctx.save();
+            this.ctx.translate(current.x + x, current.y + y);
+            this.ctx.rotate(rot);
+            this.ctx.beginPath();
+            this.ctx.moveTo(0, -s);
+            this.ctx.lineTo(-s, s);
+            this.ctx.lineTo(s, s);
+            this.ctx.closePath();
+            this.ctx.fill();
+            this.ctx.restore();
+        };
+        
+        drawArrow(0, -d, 0); // Up
+        drawArrow(0, d, Math.PI); // Down
+        drawArrow(-d, 0, -Math.PI/2); // Left
+        drawArrow(d, 0, Math.PI/2); // Right
+
         this.ctx.restore();
     }
 }

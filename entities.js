@@ -59,41 +59,69 @@ export class Player extends Entity {
     }
 
     render(ctx, isControlled) {
-        ctx.beginPath();
-        ctx.arc(this.pos.x, this.pos.y, this.radius, 0, Math.PI * 2);
-        ctx.fillStyle = this.color;
-        ctx.fill();
-        ctx.lineWidth = 2;
-        ctx.strokeStyle = this.outline;
-        ctx.stroke();
+        // Shoulders (rounded rect)
+        ctx.save();
+        ctx.translate(this.pos.x, this.pos.y);
+        const heading = Vector.mag(this.vel) > 0.1 ? Math.atan2(this.vel.y, this.vel.x) : (this.team === 0 ? -Math.PI/2 : Math.PI/2);
+        ctx.rotate(heading);
 
-        // Draw stick
-        const heading = Vector.mag(this.vel) > 0.1 ? Math.atan2(this.vel.y, this.vel.x) : Math.PI/2;
-        const stickLength = 20;
+        // Stick
         ctx.beginPath();
-        ctx.moveTo(this.pos.x, this.pos.y);
-        ctx.lineTo(this.pos.x + Math.cos(heading) * stickLength, this.pos.y + Math.sin(heading) * stickLength);
-        ctx.strokeStyle = '#a67c00'; // Wood color
+        ctx.moveTo(10, 10); // Offset to the side
+        ctx.lineTo(25, 10);
+        ctx.lineTo(30, 15); // Blade
+        ctx.strokeStyle = '#333'; // Stick color
         ctx.lineWidth = 3;
         ctx.stroke();
 
-        // Render selection highlight if player is currently controlled via one-touch switching
-        if (isControlled) {
-            ctx.beginPath();
-            ctx.arc(this.pos.x, this.pos.y, this.radius + 6, 0, Math.PI * 2);
-            ctx.strokeStyle = '#ff0000';
-            ctx.lineWidth = 2;
-            ctx.setLineDash([5, 5]);
-            ctx.stroke();
-            ctx.setLineDash([]);
-        }
+        // Shoulders
+        ctx.beginPath();
+        ctx.roundRect(-8, -14, 16, 28, 6);
+        ctx.fillStyle = this.color;
+        ctx.fill();
+        ctx.lineWidth = 2;
+        ctx.strokeStyle = '#000';
+        ctx.stroke();
+        
+        // Helmet
+        ctx.beginPath();
+        ctx.arc(0, 0, 8, 0, Math.PI * 2);
+        ctx.fillStyle = this.team === 0 ? '#111' : '#eee';
+        ctx.fill();
+        ctx.stroke();
 
-        // Draw player number
+        // Number on back
+        ctx.rotate(-heading); // Keep text upright
         ctx.fillStyle = this.team === 0 ? '#fff' : '#000';
-        ctx.font = '10px Oswald';
+        ctx.font = 'bold 10px Oswald';
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
-        ctx.fillText(this.id, this.pos.x, this.pos.y);
+        ctx.fillText(this.id, 0, 0);
+        
+        ctx.restore();
+
+        // Highlight ring & Name
+        if (isControlled) {
+            ctx.beginPath();
+            ctx.arc(this.pos.x, this.pos.y, this.radius + 10, 0, Math.PI * 2);
+            ctx.strokeStyle = '#ff3333'; // Bright red ring
+            ctx.lineWidth = 4;
+            ctx.stroke();
+
+            // Name plate
+            const names = ['EKHOLM', 'ROBERTS', 'GRAND', 'SMITH'];
+            const pName = 'J. ' + names[this.id % names.length];
+            
+            ctx.font = 'bold 12px Oswald';
+            const textWidth = ctx.measureText(pName).width;
+            
+            // Text shadow/outline
+            ctx.fillStyle = '#000';
+            ctx.fillText(pName, this.pos.x + 1, this.pos.y + this.radius + 21);
+            
+            ctx.fillStyle = '#fff';
+            ctx.fillText(pName, this.pos.x, this.pos.y + this.radius + 20);
+        }
     }
 
     // Steering Behaviors
@@ -132,12 +160,16 @@ export class Puck extends Entity {
     render(ctx) {
         ctx.beginPath();
         ctx.arc(this.pos.x, this.pos.y, this.radius, 0, Math.PI * 2);
-        ctx.fillStyle = '#000';
+        ctx.fillStyle = '#111';
         ctx.fill();
-        // Dot in center
+        ctx.lineWidth = 1;
+        ctx.strokeStyle = '#555';
+        ctx.stroke();
+        
+        // Lighting reflection dot
         ctx.beginPath();
-        ctx.arc(this.pos.x, this.pos.y, 2, 0, Math.PI * 2);
-        ctx.fillStyle = '#444';
+        ctx.arc(this.pos.x - 2, this.pos.y - 2, 2, 0, Math.PI * 2);
+        ctx.fillStyle = 'rgba(255,255,255,0.4)';
         ctx.fill();
     }
 }
@@ -223,9 +255,16 @@ export class Rink {
         const cx = this.width / 2;
         const cy = this.height / 2;
 
-        // Dark background outside the rink (stadium seats representation)
-        ctx.fillStyle = '#1a1a24';
-        ctx.fillRect(-2000, -2000, this.width + 4000, this.height + 4000);
+        // Draw Stadium Seats Background (Rows)
+        ctx.fillStyle = '#222';
+        ctx.fillRect(-1000, -1000, this.width + 2000, this.height + 2000);
+        ctx.strokeStyle = '#333';
+        ctx.lineWidth = 10;
+        for (let i = 0; i < 20; i++) {
+            ctx.beginPath();
+            ctx.roundRect(-200 - i * 50, -200 - i * 50, this.width + 400 + i * 100, this.height + 400 + i * 100, this.boardsRadius + 100 + i * 50);
+            ctx.stroke();
+        }
 
         // Draw the rounded rink
         const r = this.boardsRadius;
@@ -247,6 +286,24 @@ export class Rink {
 
         ctx.fillStyle = '#eaf5fa'; // Ice color
         ctx.fill();
+        
+        // Ice Spotlights (Soft gradients)
+        ctx.save();
+        ctx.globalCompositeOperation = 'screen';
+        const spots = [
+            {x: cx, y: cy}, {x: cx-200, y: cy-400}, {x: cx+200, y: cy-400},
+            {x: cx-200, y: cy+400}, {x: cx+200, y: cy+400}
+        ];
+        spots.forEach(s => {
+            const grad = ctx.createRadialGradient(s.x, s.y, 0, s.x, s.y, 300);
+            grad.addColorStop(0, 'rgba(255, 255, 255, 0.2)');
+            grad.addColorStop(1, 'rgba(255, 255, 255, 0)');
+            ctx.fillStyle = grad;
+            ctx.beginPath();
+            ctx.arc(s.x, s.y, 300, 0, Math.PI * 2);
+            ctx.fill();
+        });
+        ctx.restore();
 
         // Thick Boards border
         ctx.lineWidth = 12;
@@ -281,6 +338,40 @@ export class Rink {
         ctx.lineTo(this.width, cy + 250);
         ctx.stroke();
         
+        // ROCKY MOUNTAIN Logo
+        ctx.save();
+        ctx.translate(cx, cy);
+        ctx.globalAlpha = 0.5;
+        // Shield
+        ctx.beginPath();
+        ctx.moveTo(0, -60);
+        ctx.lineTo(50, -30);
+        ctx.lineTo(50, 40);
+        ctx.lineTo(0, 70);
+        ctx.lineTo(-50, 40);
+        ctx.lineTo(-50, -30);
+        ctx.closePath();
+        ctx.fillStyle = '#fff';
+        ctx.fill();
+        ctx.strokeStyle = '#286090';
+        ctx.lineWidth = 3;
+        ctx.stroke();
+        // Mountains
+        ctx.fillStyle = '#286090';
+        ctx.beginPath();
+        ctx.moveTo(-45, 30);
+        ctx.lineTo(-20, -10);
+        ctx.lineTo(0, 10);
+        ctx.lineTo(30, -30);
+        ctx.lineTo(45, 30);
+        ctx.fill();
+        // Text
+        ctx.fillStyle = '#286090';
+        ctx.font = 'bold 12px Oswald';
+        ctx.textAlign = 'center';
+        ctx.fillText("ROCKY MOUNTAIN", 0, 50);
+        ctx.restore();
+
         // Goal lines (Red)
         ctx.strokeStyle = '#c9302c';
         ctx.beginPath();
@@ -326,24 +417,42 @@ export class Rink {
         
         ctx.restore(); // remove clip
 
-        // Goals rendering (Draw them after clipping so they can sit on the line properly without being cut)
-        ctx.strokeStyle = '#d9534f'; // Red goal posts
-        ctx.lineWidth = 4;
-        
-        // Top goal
-        ctx.beginPath();
-        ctx.moveTo(cx - this.goalWidth/2, this.goalOffset);
-        ctx.lineTo(cx - this.goalWidth/2, this.goalOffset - this.goalDepth);
-        ctx.lineTo(cx + this.goalWidth/2, this.goalOffset - this.goalDepth);
-        ctx.lineTo(cx + this.goalWidth/2, this.goalOffset);
-        ctx.stroke();
+        // Goals rendering
+        const drawGoal = (yOffset, dir) => {
+            // Netting
+            ctx.save();
+            ctx.beginPath();
+            ctx.moveTo(cx - this.goalWidth/2, yOffset);
+            ctx.lineTo(cx - this.goalWidth/2 + 5, yOffset - this.goalDepth * dir);
+            ctx.lineTo(cx + this.goalWidth/2 - 5, yOffset - this.goalDepth * dir);
+            ctx.lineTo(cx + this.goalWidth/2, yOffset);
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.5)';
+            ctx.fill();
+            
+            // Netting grid
+            ctx.setLineDash([2, 2]);
+            ctx.strokeStyle = '#aaa';
+            ctx.lineWidth = 1;
+            for(let i=0; i<this.goalWidth; i+=6) {
+                ctx.beginPath(); ctx.moveTo(cx - this.goalWidth/2 + i, yOffset);
+                ctx.lineTo(cx - this.goalWidth/2 + i * 0.9, yOffset - this.goalDepth * dir); ctx.stroke();
+            }
+            
+            // Frame
+            ctx.setLineDash([]);
+            ctx.strokeStyle = '#d9534f'; // Red posts
+            ctx.lineWidth = 5;
+            ctx.lineJoin = 'round';
+            ctx.beginPath();
+            ctx.moveTo(cx - this.goalWidth/2, yOffset);
+            ctx.lineTo(cx - this.goalWidth/2 + 5, yOffset - this.goalDepth * dir);
+            ctx.lineTo(cx + this.goalWidth/2 - 5, yOffset - this.goalDepth * dir);
+            ctx.lineTo(cx + this.goalWidth/2, yOffset);
+            ctx.stroke();
+            ctx.restore();
+        };
 
-        // Bottom goal
-        ctx.beginPath();
-        ctx.moveTo(cx - this.goalWidth/2, this.height - this.goalOffset);
-        ctx.lineTo(cx - this.goalWidth/2, this.height - this.goalOffset + this.goalDepth);
-        ctx.lineTo(cx + this.goalWidth/2, this.height - this.goalOffset + this.goalDepth);
-        ctx.lineTo(cx + this.goalWidth/2, this.height - this.goalOffset);
-        ctx.stroke();
+        drawGoal(this.goalOffset, 1); // Top
+        drawGoal(this.height - this.goalOffset, -1); // Bottom
     }
 }
