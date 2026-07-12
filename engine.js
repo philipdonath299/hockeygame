@@ -91,10 +91,12 @@ export class InputManager {
 
         for (let i = 0; i < e.changedTouches.length; i++) {
             const touch = e.changedTouches[i];
-            const x = touch.clientX - rect.left;
-            const y = touch.clientY - rect.top;
+            const scaleX = this.canvas.width / rect.width;
+            const scaleY = this.canvas.height / rect.height;
+            const x = (touch.clientX - rect.left) * scaleX;
+            const y = (touch.clientY - rect.top) * scaleY;
 
-            if (y > thresholdY) {
+            if (y > thresholdY * scaleY) {
                 // Inside joystick zone
                 if (!this.joystick.active) {
                     this.joystick.active = true;
@@ -121,8 +123,10 @@ export class InputManager {
 
         for (let i = 0; i < e.changedTouches.length; i++) {
             const touch = e.changedTouches[i];
-            const x = touch.clientX - rect.left;
-            const y = touch.clientY - rect.top;
+            const scaleX = this.canvas.width / rect.width;
+            const scaleY = this.canvas.height / rect.height;
+            const x = (touch.clientX - rect.left) * scaleX;
+            const y = (touch.clientY - rect.top) * scaleY;
 
             if (touch.identifier === this.joystick.touchId) {
                 this.joystick.current = { x, y };

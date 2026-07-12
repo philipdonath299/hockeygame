@@ -13,7 +13,7 @@ class Game {
         this.engine = new GameEngine((dt) => this.update(dt), (alpha) => this.render(alpha));
 
         this.gameState = 'PLAYING'; // PLAYING, GOAL, FACEOFF
-        this.rink = new Rink(800, 1400); // Fixed size, larger than screen
+        this.rink = new Rink(800, 1800); // Taller rink for mobile aspect ratios
         this.camera = { x: 0, y: 0 };
         this.puck = new Puck(400, 700);
         
@@ -31,8 +31,10 @@ class Game {
     }
 
     resize() {
-        this.width = window.innerWidth;
-        this.height = window.innerHeight;
+        // Fix internal width to 800 so the whole rink is visible horizontally
+        this.width = 800;
+        // Scale height proportionally to screen aspect ratio
+        this.height = Math.floor(800 * (window.innerHeight / window.innerWidth));
         this.canvas.width = this.width;
         this.canvas.height = this.height;
     }
@@ -40,13 +42,13 @@ class Game {
     setupMatch(teamSize) {
         this.players = [];
         const cx = 400; // this.rink.width / 2
-        const cy = 700; // this.rink.height / 2
+        const cy = 900; // this.rink.height / 2
         
         // Team 0 (Player) - Attacks UP (Defends BOTTOM goal)
         this.players.push(new Player(cx, cy + 50, 0, 99)); // Center
         this.players.push(new Player(cx - 60, cy + 100, 0, 8));  // LW
         this.players.push(new Player(cx + 60, cy + 100, 0, 19)); // RW
-        this.players.push(new Player(cx, 1300, 0, 31, true)); // Goalie
+        this.players.push(new Player(cx, 1700, 0, 31, true)); // Goalie
         
         // Team 1 (AI) - Attacks DOWN (Defends TOP goal)
         this.players.push(new Player(cx, cy - 50, 1, 87)); // Center
@@ -60,13 +62,13 @@ class Game {
 
     resetPositions() {
         const cx = 400;
-        const cy = 700;
+        const cy = 900;
         this.puck.pos = { x: cx, y: cy };
         this.puck.vel = { x: 0, y: 0 };
         this.puck.carrier = null;
         
         const positions = [
-            {x: cx, y: cy + 50}, {x: cx - 60, y: cy + 100}, {x: cx + 60, y: cy + 100}, {x: cx, y: 1300},
+            {x: cx, y: cy + 50}, {x: cx - 60, y: cy + 100}, {x: cx + 60, y: cy + 100}, {x: cx, y: 1700},
             {x: cx, y: cy - 50}, {x: cx - 60, y: cy - 100}, {x: cx + 60, y: cy - 100}, {x: cx, y: 100}
         ];
         
@@ -202,14 +204,14 @@ class Game {
         const team0HasPuck = this.players.some(p => p.team === 0 && p.hasPuck);
         const team1HasPuck = this.players.some(p => p.team === 1 && p.hasPuck);
         const topGoalPos = { x: 400, y: 0 };
-        const bottomGoalPos = { x: 400, y: 1400 };
+        const bottomGoalPos = { x: 400, y: 1800 };
 
         this.players.forEach((p, i) => {
             if (i === this.controlledPlayerIndex) return; // Skip human controlled
             
             if (p.isGoalie) {
                 // Goalie AI
-                const myGoalY = p.team === 0 ? 1300 : 100;
+                const myGoalY = p.team === 0 ? 1700 : 100;
                 const goalPos = { x: 400, y: myGoalY };
                 const dirToPuck = Vector.normalize(Vector.sub(this.puck.pos, goalPos));
                 // Stay on the angle, slightly out of the net
@@ -228,7 +230,7 @@ class Game {
                     p.applyForce(force);
                     
                     // Simple shoot logic
-                    if (p.pos.y > 700 && Math.random() < 0.01) {
+                    if (p.pos.y > 900 && Math.random() < 0.01) {
                          // Shoot
                          this.shots[1]++;
                          document.getElementById('shots-away').innerText = this.shots[1];
@@ -362,9 +364,9 @@ class Game {
         let targetCamX = this.puck.pos.x - this.width / 2;
         let targetCamY = this.puck.pos.y - this.height / 2;
         
-        // Clamp camera to rink bounds
-        targetCamX = Math.max(0, Math.min(targetCamX, this.rink.width - this.width));
-        targetCamY = Math.max(0, Math.min(targetCamY, this.rink.height - this.height));
+        // Clamp camera to rink bounds (ensure we don't clamp negatively if screen is somehow taller than rink)
+        targetCamX = Math.max(0, Math.min(targetCamX, Math.max(0, this.rink.width - this.width)));
+        targetCamY = Math.max(0, Math.min(targetCamY, Math.max(0, this.rink.height - this.height)));
         
         // Smooth camera follow
         this.camera.x += (targetCamX - this.camera.x) * 0.1;
