@@ -78,7 +78,7 @@ export class Player extends Entity {
 
         // Shoulders
         ctx.beginPath();
-        ctx.roundRect(-12, -16, 24, 32, 8);
+        this.drawRoundRect(ctx, -12, -16, 24, 32, 8);
         ctx.fillStyle = this.color;
         ctx.fill();
         ctx.lineWidth = 2;
@@ -125,7 +125,7 @@ export class Player extends Entity {
 
             ctx.fillStyle = '#65c2db';
             ctx.beginPath();
-            ctx.roundRect(this.pos.x - textWidth/2 - 6, this.pos.y + this.radius + 12, textWidth + 12, 16, 4);
+            this.drawRoundRect(ctx, this.pos.x - textWidth/2 - 6, this.pos.y + this.radius + 12, textWidth + 12, 16, 4);
             ctx.fill();
             ctx.strokeStyle = '#fff';
             ctx.lineWidth = 1.5;
@@ -275,26 +275,14 @@ export class Rink {
         ctx.lineWidth = 10;
         for (let i = 0; i < 20; i++) {
             ctx.beginPath();
-            ctx.roundRect(-200 - i * 50, -200 - i * 50, this.width + 400 + i * 100, this.height + 400 + i * 100, this.boardsRadius + 100 + i * 50);
+            this.drawRoundRect(ctx, -200 - i * 50, -200 - i * 50, this.width + 400 + i * 100, this.height + 400 + i * 100, this.boardsRadius + 100 + i * 50);
             ctx.stroke();
         }
 
         // Draw the rounded rink
         const r = this.boardsRadius;
         ctx.beginPath();
-        if (ctx.roundRect) {
-            ctx.roundRect(0, 0, this.width, this.height, r);
-        } else {
-            ctx.moveTo(r, 0);
-            ctx.lineTo(this.width - r, 0);
-            ctx.quadraticCurveTo(this.width, 0, this.width, r);
-            ctx.lineTo(this.width, this.height - r);
-            ctx.quadraticCurveTo(this.width, this.height, this.width - r, this.height);
-            ctx.lineTo(r, this.height);
-            ctx.quadraticCurveTo(0, this.height, 0, this.height - r);
-            ctx.lineTo(0, r);
-            ctx.quadraticCurveTo(0, 0, r, 0);
-        }
+        this.drawRoundRect(ctx, 0, 0, this.width, this.height, r);
         ctx.closePath();
 
         ctx.fillStyle = '#eaf5fa'; // Ice color
@@ -493,5 +481,18 @@ export class Rink {
 
         drawGoal(this.goalOffset, 1); // Top
         drawGoal(this.height - this.goalOffset, -1); // Bottom
+    }
+
+    drawRoundRect(ctx, x, y, width, height, radius) {
+        ctx.moveTo(x + radius, y);
+        ctx.lineTo(x + width - radius, y);
+        ctx.quadraticCurveTo(x + width, y, x + width, y + radius);
+        ctx.lineTo(x + width, y + height - radius);
+        ctx.quadraticCurveTo(x + width, y + height, x + width - radius, y + height);
+        ctx.lineTo(x + radius, y + height);
+        ctx.quadraticCurveTo(x, y + height, x, y + height - radius);
+        ctx.lineTo(x, y + radius);
+        ctx.quadraticCurveTo(x, y, x + radius, y);
+        ctx.closePath();
     }
 }
