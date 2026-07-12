@@ -97,9 +97,10 @@ export class Player {
         this.isGoalie = isGoalie;
         this.hasPuck  = false;
         this.stunTimer = 0;
-        this.maxSpeed = isGoalie ? 4.5 : 6.8;
-        this.friction = 0.83;
+        this.maxSpeed = isGoalie ? 4.5 : 7.2;
+        this.friction = 0.84;
         this.angle    = team === 0 ? -Math.PI / 2 : Math.PI / 2;
+        this.tackleFrames = 0; // active body-check frames (set when lunging)
 
         // Visual state
         this.skatePhase  = Math.random() * Math.PI * 2;
@@ -127,29 +128,42 @@ export class Player {
     update(dt) {
         if (this.stunTimer > 0) this.stunTimer -= dt;
         if (this.hitFlash  > 0) this.hitFlash  -= dt;
+        if (this.tackleFrames > 0) this.tackleFrames--;
+
+        // ── Ice friction: more friction perpendicular to motion (realistic skating)
+        const spd = Math.sqrt(this.vel.x**2 + this.vel.y**2);
+        if (spd > 0.01) {
+            // Parallel and perpendicular components of velocity
+            const fwdX = this.vel.x / spd, fwdY = this.vel.y / spd;
+            // Lateral component (perpendicular to facing angle)
+            const sideX = -fwdY, sideY = fwdX;
+            const latV = this.vel.x * sideX + this.vel.y * sideY;
+            // Dampen lateral slip more than forward glide
+            this.vel.x -= sideX * latV * 0.18;
+            this.vel.y -= sideY * latV * 0.18;
+        }
 
         this.vel.x *= this.friction;
         this.vel.y *= this.friction;
 
-        const spd = Math.sqrt(this.vel.x**2 + this.vel.y**2);
-        if (spd > this.maxSpeed) {
-            this.vel.x = (this.vel.x / spd) * this.maxSpeed;
-            this.vel.y = (this.vel.y / spd) * this.maxSpeed;
+        const spd2 = Math.sqrt(this.vel.x**2 + this.vel.y**2);
+        if (spd2 > this.maxSpeed) {
+            this.vel.x = (this.vel.x / spd2) * this.maxSpeed;
+            this.vel.y = (this.vel.y / spd2) * this.maxSpeed;
         }
 
         this.pos.x += this.vel.x;
         this.pos.y += this.vel.y;
 
-        if (spd > 0.4) {
+        if (spd2 > 0.4) {
             const target = Math.atan2(this.vel.y, this.vel.x);
             let delta = target - this.angle;
             while (delta >  Math.PI) delta -= Math.PI * 2;
             while (delta < -Math.PI) delta += Math.PI * 2;
-            this.angle += delta * 0.2;
+            this.angle += delta * 0.22;
         }
 
-        // Skate animation phase
-        if (spd > 0.5) this.skatePhase += dt * spd * 3;
+        if (spd2 > 0.5) this.skatePhase += dt * spd2 * 3;
     }
 
     render(ctx, isControlled) {
