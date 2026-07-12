@@ -204,10 +204,10 @@ export class Rink {
     constructor(width, height) {
         this.width = width;
         this.height = height;
-        this.boardsRadius = 150;
-        this.goalWidth = 80;
-        this.goalDepth = 30;
+        this.boardsRadius = 80;
+        this.goalWidth = 120;
         this.goalOffset = 100;
+        this.goalDepth = 30;
     }
 
     // Handle collision with outer boards (including rounded corners)
@@ -316,46 +316,50 @@ export class Rink {
         ctx.restore();
 
         // Thick Boards border
-        ctx.lineWidth = 20;
-        ctx.strokeStyle = '#fff'; // White boards base
-        ctx.stroke();
-        ctx.lineWidth = 8;
-        ctx.strokeStyle = '#0055a4'; // Blue trim on top
+        ctx.lineWidth = 12;
+        ctx.strokeStyle = '#fff'; // Boards (white)
         ctx.stroke();
 
-        // Draw Ads on Boards
+        // Ad boards / Text on boards
         ctx.save();
-        ctx.fillStyle = '#111';
+        ctx.clip(); // Keeps ads on the ice
+        
+        // Ads (Red text)
+        ctx.fillStyle = '#ff0000';
+        ctx.font = 'bold 24px Oswald';
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
-        ctx.font = 'bold 16px Oswald';
-        // Clip text to just the top/bottom edges
-        ctx.fillText("BIG IDEA GAMES        SUPERSTAR HOCKEY        BIG IDEA GAMES", cx, -5);
-        ctx.fillText("BIG IDEA GAMES        SUPERSTAR HOCKEY        BIG IDEA GAMES", cx, this.height + 5);
+        
+        ctx.save();
+        ctx.translate(this.width / 2, 10);
+        ctx.rotate(Math.PI);
+        ctx.fillText("BIG IDEA GAMES", 0, 0);
+        ctx.restore();
+        
+        ctx.save();
+        ctx.translate(this.width / 2, this.height - 10);
+        ctx.fillText("SUPERSTAR HOCKEY", 0, 0);
+        ctx.restore();
         ctx.restore();
 
         // Clip all ice markings to not bleed out of the rounded rink
         ctx.save();
         ctx.clip();
 
-        ctx.strokeStyle = '#c9302c'; // Red lines
-        ctx.lineWidth = 3;
-
-        // Center red line
-        ctx.beginPath();
-        ctx.moveTo(0, cy);
-        ctx.lineTo(this.width, cy);
-        ctx.stroke();
-
+        // Center line (Red)
+        ctx.fillStyle = '#c9302c';
+        ctx.fillRect(0, cy - 4, this.width, 8);
+        
         // Blue lines
-        ctx.strokeStyle = '#286090';
+        ctx.fillStyle = '#0055a4';
+        ctx.fillRect(0, cy - 180, this.width, 8);
+        ctx.fillRect(0, cy + 180, this.width, 8);
+        
+        // Center circle
         ctx.beginPath();
-        ctx.moveTo(0, cy - 250);
-        ctx.lineTo(this.width, cy - 250);
-        ctx.stroke();
-        ctx.beginPath();
-        ctx.moveTo(0, cy + 250);
-        ctx.lineTo(this.width, cy + 250);
+        ctx.arc(cx, cy, 80, 0, Math.PI * 2);
+        ctx.lineWidth = 3;
+        ctx.strokeStyle = '#0055a4';
         ctx.stroke();
         
         // ROCKY MOUNTAIN Logo
@@ -373,7 +377,7 @@ export class Rink {
         ctx.closePath();
         ctx.fillStyle = '#fff';
         ctx.fill();
-        ctx.strokeStyle = '#65c2db'; // Icy light blue
+        ctx.strokeStyle = '#65c2db';
         ctx.lineWidth = 4;
         ctx.stroke();
         // Mountains
@@ -389,7 +393,6 @@ export class Rink {
         ctx.fillStyle = '#65c2db';
         ctx.font = 'bold 16px Oswald';
         ctx.textAlign = 'center';
-        // White outline for text readability
         ctx.strokeStyle = '#fff';
         ctx.lineWidth = 3;
         ctx.strokeText("ROCKY MOUNTAIN", 0, 50);
@@ -398,6 +401,7 @@ export class Rink {
 
         // Goal lines (Red)
         ctx.strokeStyle = '#c9302c';
+        ctx.lineWidth = 3;
         ctx.beginPath();
         ctx.moveTo(0, this.goalOffset);
         ctx.lineTo(this.width, this.goalOffset);
@@ -406,48 +410,37 @@ export class Rink {
         ctx.moveTo(0, this.height - this.goalOffset);
         ctx.lineTo(this.width, this.height - this.goalOffset);
         ctx.stroke();
-
-        // Center circle
+        
+        // Center dot
         ctx.beginPath();
-        ctx.arc(cx, cy, 100, 0, Math.PI * 2);
-        ctx.strokeStyle = '#286090';
-        ctx.lineWidth = 4;
-        ctx.stroke();
+        ctx.arc(cx, cy, 6, 0, Math.PI * 2);
+        ctx.fillStyle = '#0055a4';
+        ctx.fill();
 
-        // Faceoff dots & circles
-        const dots = [
-            { x: cx, y: cy },
-            { x: cx - 180, y: cy - 400 }, { x: cx + 180, y: cy - 400 },
-            { x: cx - 180, y: cy + 400 }, { x: cx + 180, y: cy + 400 }
-        ];
-        dots.forEach(d => {
-            // Dot
-            ctx.fillStyle = '#c9302c';
+        // Faceoff dots
+        const drawDot = (dx, dy) => {
             ctx.beginPath();
-            ctx.arc(d.x, d.y, 6, 0, Math.PI * 2);
+            ctx.arc(cx + dx, cy + dy, 4, 0, Math.PI * 2);
+            ctx.fillStyle = '#c9302c';
             ctx.fill();
-            // Circle (only for outer dots)
-            if (d.y !== cy) {
-                ctx.strokeStyle = '#c9302c';
-                ctx.lineWidth = 2;
-                ctx.beginPath();
-                ctx.arc(d.x, d.y, 80, 0, Math.PI * 2);
-                ctx.stroke();
-            }
-        });
-
+        };
+        drawDot(-150, -280);
+        drawDot(150, -280);
+        drawDot(-150, 280);
+        drawDot(150, 280);
+        
         // Creases (Light blue fill, red border)
         ctx.fillStyle = 'rgba(100, 150, 255, 0.2)';
         ctx.strokeStyle = '#c9302c';
         ctx.lineWidth = 3;
         
         ctx.beginPath();
-        ctx.arc(cx, this.goalOffset, 60, 0, Math.PI);
+        ctx.arc(cx, this.goalOffset, 45, 0, Math.PI);
         ctx.fill();
         ctx.stroke();
 
         ctx.beginPath();
-        ctx.arc(cx, this.height - this.goalOffset, 60, Math.PI, Math.PI * 2);
+        ctx.arc(cx, this.height - this.goalOffset, 45, Math.PI, Math.PI * 2);
         ctx.fill();
         ctx.stroke();
         

@@ -13,7 +13,7 @@ class Game {
         this.engine = new GameEngine((dt) => this.update(dt), (alpha) => this.render(alpha));
 
         this.gameState = 'PLAYING'; // PLAYING, GOAL, FACEOFF
-        this.rink = new Rink(800, 1800); // Taller rink for mobile aspect ratios
+        this.rink = new Rink(600, 1200); // Smaller arcade rink
         this.camera = { x: 0, y: 0 };
         this.puck = new Puck(400, 700);
         
@@ -46,19 +46,19 @@ class Game {
 
     setupMatch(teamSize) {
         this.players = [];
-        const cx = 400; // this.rink.width / 2
-        const cy = 900; // this.rink.height / 2
+        const cx = 300; // this.rink.width / 2
+        const cy = 600; // this.rink.height / 2
         
         // Team 0 (Player) - Attacks UP (Defends BOTTOM goal)
         this.players.push(new Player(cx, cy + 50, 0, 99)); // Center
-        this.players.push(new Player(cx - 100, cy + 120, 0, 8));  // LW
-        this.players.push(new Player(cx + 100, cy + 120, 0, 19)); // RW
-        this.players.push(new Player(cx, 1700, 0, 31, true)); // Goalie
+        this.players.push(new Player(cx - 80, cy + 100, 0, 8));  // LW
+        this.players.push(new Player(cx + 80, cy + 100, 0, 19)); // RW
+        this.players.push(new Player(cx, 1100, 0, 31, true)); // Goalie
         
         // Team 1 (AI) - Attacks DOWN (Defends TOP goal)
         this.players.push(new Player(cx, cy - 50, 1, 87)); // Center
-        this.players.push(new Player(cx - 100, cy - 120, 1, 71)); // RW
-        this.players.push(new Player(cx + 100, cy - 120, 1, 58)); // LW
+        this.players.push(new Player(cx - 80, cy - 100, 1, 71)); // RW
+        this.players.push(new Player(cx + 80, cy - 100, 1, 58)); // LW
         this.players.push(new Player(cx, 100, 1, 30, true)); // Goalie
         
         this.resetPositions();
@@ -66,15 +66,15 @@ class Game {
     }
 
     resetPositions() {
-        const cx = 400;
-        const cy = 900;
+        const cx = 300;
+        const cy = 600;
         this.puck.pos = { x: cx, y: cy };
         this.puck.vel = { x: 0, y: 0 };
         this.puck.carrier = null;
         
         const positions = [
-            {x: cx, y: cy + 50}, {x: cx - 100, y: cy + 120}, {x: cx + 100, y: cy + 120}, {x: cx, y: 1700},
-            {x: cx, y: cy - 50}, {x: cx - 100, y: cy - 120}, {x: cx + 100, y: cy - 120}, {x: cx, y: 100}
+            {x: cx, y: cy + 50}, {x: cx - 80, y: cy + 100}, {x: cx + 80, y: cy + 100}, {x: cx, y: 1100},
+            {x: cx, y: cy - 50}, {x: cx - 80, y: cy - 100}, {x: cx + 80, y: cy - 100}, {x: cx, y: 100}
         ];
         
         this.players.forEach((p, i) => {
@@ -93,7 +93,7 @@ class Game {
             
             if (p.hasPuck) {
                 // Determine Shot vs Pass
-                const goalPos = { x: 400, y: 100 }; // Team 0 goal to attack
+                const goalPos = { x: 300, y: 100 }; // Team 0 goal to attack
                 const dirToGoal = Vector.normalize(Vector.sub(goalPos, p.pos));
                 const dotGoal = dir.x * dirToGoal.x + dir.y * dirToGoal.y;
                 
@@ -244,16 +244,16 @@ class Game {
     updateAI() {
         const team0HasPuck = this.players.some(p => p.team === 0 && p.hasPuck);
         const team1HasPuck = this.players.some(p => p.team === 1 && p.hasPuck);
-        const topGoalPos = { x: 400, y: 0 };
-        const bottomGoalPos = { x: 400, y: 1800 };
+        const topGoalPos = { x: 300, y: 100 };
+        const bottomGoalPos = { x: 300, y: 1100 };
 
         this.players.forEach((p, i) => {
             if (i === this.controlledPlayerIndex) return; // Skip human controlled
             
             if (p.isGoalie) {
                 // Goalie AI
-                const myGoalY = p.team === 0 ? 1700 : 100;
-                const goalPos = { x: 400, y: myGoalY };
+                const myGoalY = p.team === 0 ? 1100 : 100;
+                const goalPos = { x: 300, y: myGoalY };
                 const dirToPuck = Vector.normalize(Vector.sub(this.puck.pos, goalPos));
                 // Stay on the angle, slightly out of the net
                 const target = Vector.add(goalPos, Vector.mult(dirToPuck, 30)); 
@@ -271,7 +271,7 @@ class Game {
                     p.applyForce(force);
                     
                     // Simple shoot logic
-                    if (p.pos.y > 900 && Math.random() < 0.01) {
+                    if (p.pos.y > 600 && Math.random() < 0.01) {
                          // Shoot
                          this.shots[1]++;
                          document.getElementById('shots-away').innerText = this.shots[1];
@@ -294,7 +294,7 @@ class Game {
                         p.applyForce(force);
                     } else {
                         // Collapse
-                        const force = p.arrive({ x: 400, y: 100 }, 50);
+                        const force = p.arrive({ x: 300, y: 100 }, 50);
                         p.applyForce(force);
                     }
                 }
