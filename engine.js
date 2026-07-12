@@ -50,7 +50,6 @@ export class GameEngine {
 export class InputManager {
     constructor(canvas) {
         this.canvas = canvas;
-        this.joystickZoneHeight = 0.4; // Bottom 40% of the screen
         
         // State
         this.joystick = {
@@ -59,19 +58,12 @@ export class InputManager {
             origin: { x: 0, y: 0 },
             current: { x: 0, y: 0 },
             vector: { x: 0, y: 0 }, // Normalized direction
-            magnitude: 0 // 0 to 1
+            magnitude: 0, // 0 to 1
+            startTime: 0
         };
 
-        this.action = {
-            touchId: null,
-            origin: { x: 0, y: 0 },
-            current: { x: 0, y: 0 },
-            time: 0
-        };
-        
         // Event hooks
-        this.onTap = null;   // (x, y) => {}
-        this.onSwipe = null; // (dx, dy) => {}
+        this.onJoystickRelease = null; // (vector, magnitude) => {}
 
         this.bindEvents();
     }
@@ -87,7 +79,6 @@ export class InputManager {
     handleTouchStart(e) {
         e.preventDefault();
         const rect = this.canvas.getBoundingClientRect();
-        const thresholdY = rect.height * (1 - this.joystickZoneHeight);
 
         for (let i = 0; i < e.changedTouches.length; i++) {
             const touch = e.changedTouches[i];
@@ -96,22 +87,15 @@ export class InputManager {
             const x = (touch.clientX - rect.left) * scaleX;
             const y = (touch.clientY - rect.top) * scaleY;
 
-            if (y > thresholdY * scaleY) {
-                // Inside joystick zone
+            // Restrict joystick origin to the left half of the screen
+            if (touch.clientX - rect.left < rect.width * 0.6) {
                 if (!this.joystick.active) {
                     this.joystick.active = true;
                     this.joystick.touchId = touch.identifier;
                     this.joystick.origin = { x, y };
                     this.joystick.current = { x, y };
+                    this.joystick.startTime = performance.now();
                     this.updateJoystick();
-                }
-            } else {
-                // Inside action zone (tap/swipe to pass/shoot)
-                if (this.action.touchId === null) {
-                    this.action.touchId = touch.identifier;
-                    this.action.origin = { x, y };
-                    this.action.current = { x, y };
-                    this.action.time = performance.now();
                 }
             }
         }
@@ -131,8 +115,6 @@ export class InputManager {
             if (touch.identifier === this.joystick.touchId) {
                 this.joystick.current = { x, y };
                 this.updateJoystick();
-            } else if (touch.identifier === this.action.touchId) {
-                this.action.current = { x, y };
             }
         }
     }
@@ -144,13 +126,15 @@ export class InputManager {
             const touch = e.changedTouches[i];
 
             if (touch.identifier === this.joystick.touchId) {
+                // Dispatch release event before clearing state
+                if (this.onJoystickRelease && this.joystick.magnitude > 0.1) {
+                    this.onJoystickRelease(this.joystick.vector, this.joystick.magnitude);
+                }
+
                 this.joystick.active = false;
                 this.joystick.touchId = null;
                 this.joystick.vector = { x: 0, y: 0 };
                 this.joystick.magnitude = 0;
-            } else if (touch.identifier === this.action.touchId) {
-                this.processAction();
-                this.action.touchId = null;
             }
         }
     }
@@ -170,25 +154,6 @@ export class InputManager {
             const clampedDist = Math.min(dist, maxRadius);
             this.joystick.vector = { x: dx / dist, y: dy / dist };
             this.joystick.magnitude = clampedDist / maxRadius;
-        }
-    }
-
-    processAction() {
-        const dx = this.action.current.x - this.action.origin.x;
-        const dy = this.action.current.y - this.action.origin.y;
-        const distSq = dx * dx + dy * dy;
-        const duration = performance.now() - this.action.time;
-        
-        // Tap threshold: less than 400 pixels squared (20px radius) movement
-        if (distSq < 400 && duration < 300) { 
-            if (this.onTap) {
-                this.onTap(this.action.current.x, this.action.current.y);
-            }
-        } else {
-            // Swipe
-            if (this.onSwipe) {
-                this.onSwipe(dx, dy);
-            }
         }
     }
 }

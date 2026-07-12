@@ -83,50 +83,86 @@ class Game {
     }
 
     bindInput() {
-        this.input.onTap = (x, y) => {
-            const worldX = x + this.camera.x;
-            const worldY = y + this.camera.y;
+        this.input.onJoystickRelease = (dir, magnitude) => {
+            if (this.controlledPlayerIndex === -1) return;
+            const p = this.players[this.controlledPlayerIndex];
             
-            if (this.puck.carrier && this.puck.carrier.team === 0) {
-                // Find nearest friendly to pass to
-                let bestTarget = null;
-                let minSqDist = Infinity;
+            if (p.hasPuck) {
+                // Determine Shot vs Pass
+                const goalPos = { x: 400, y: 100 }; // Team 0 goal to attack
+                const dirToGoal = Vector.normalize(Vector.sub(goalPos, p.pos));
+                const dotGoal = dir.x * dirToGoal.x + dir.y * dirToGoal.y;
                 
-                this.players.forEach(p => {
-                    if (p.team === 0 && p !== this.puck.carrier) {
-                        const distSq = Math.pow(p.pos.x - worldX, 2) + Math.pow(p.pos.y - worldY, 2);
+                // If aiming roughly towards the goal (e.g. dot product > 0.8 which is ~36 degrees)
+                if (dotGoal > 0.8) {
+                    this.executeShot(dir, 15);
+                } else {
+                    // Try to find a teammate to pass to
+                    let bestTarget = null;
+                    let bestDot = -1;
+                    
+                    this.players.forEach(teammate => {
+                        if (teammate.team === 0 && teammate !== p) {
+                            const dirToTeammate = Vector.normalize(Vector.sub(teammate.pos, p.pos));
+                            const dotTeammate = dir.x * dirToTeammate.x + dir.y * dirToTeammate.y;
+                            if (dotTeammate > 0.7 && dotTeammate > bestDot) { // ~45 degrees
+                                bestDot = dotTeammate;
+                                bestTarget = teammate;
+                            }
+                        }
+                    });
+                    
+                    if (bestTarget) {
+                        this.executePass(bestTarget);
+                    } else {
+                        // Fallback: Dump puck in direction
+                        this.executeShot(dir, 8); // Weaker dump
+                    }
+                }
+            } else {
+                // Tackling logic
+                let bestTarget = null;
+                let minSqDist = 200 * 200; // Tackle range 200 units
+                
+                this.players.forEach(opp => {
+                    if (opp.team === 1) {
+                        const vecToOpp = Vector.sub(opp.pos, p.pos);
+                        const distSq = vecToOpp.x * vecToOpp.x + vecToOpp.y * vecToOpp.y;
                         if (distSq < minSqDist) {
-                            minSqDist = distSq;
-                            bestTarget = p;
+                            const dirToOpp = Vector.normalize(vecToOpp);
+                            const dotOpp = dir.x * dirToOpp.x + dir.y * dirToOpp.y;
+                            if (dotOpp > 0.7) { // roughly facing them
+                                minSqDist = distSq;
+                                bestTarget = opp;
+                            }
                         }
                     }
                 });
 
                 if (bestTarget) {
-                    this.executePass(bestTarget);
+                    // Apply huge impulse forward for tackle
+                    p.vel = Vector.mult(dir, 25);
+                } else {
+                    // Just a small dash if nothing is there
+                    p.vel = Vector.add(p.vel, Vector.mult(dir, 10));
                 }
-            }
-        };
-
-        this.input.onSwipe = (dx, dy) => {
-            if (this.puck.carrier && this.puck.carrier.team === 0) {
-                // Execute shot
-                this.shots[0]++;
-                document.getElementById('shots-home').innerText = this.shots[0];
-                const dir = Vector.normalize({ x: dx, y: dy });
-                const shotPower = 12; // Massive impulse
-                
-                this.puck.vel = Vector.add(this.puck.carrier.vel, Vector.mult(dir, shotPower));
-                this.puck.pos = Vector.add(this.puck.pos, Vector.mult(dir, this.puck.radius + this.puck.carrier.radius + 2)); // Offset to avoid immediate re-catch
-                this.puck.carrier.hasPuck = false;
-                this.puck.carrier = null;
             }
         };
     }
 
+    executeShot(dir, power = 15) {
+        this.shots[0]++;
+        document.getElementById('shots-home').innerText = this.shots[0];
+        
+        this.puck.vel = Vector.add(this.puck.carrier.vel, Vector.mult(dir, power));
+        this.puck.pos = Vector.add(this.puck.pos, Vector.mult(dir, this.puck.radius + this.puck.carrier.radius + 2));
+        this.puck.carrier.hasPuck = false;
+        this.puck.carrier = null;
+    }
+
     executePass(targetPlayer) {
         const dir = Vector.normalize(Vector.sub(targetPlayer.pos, this.puck.carrier.pos));
-        const passPower = 8;
+        const passPower = 12;
         this.puck.vel = Vector.add(this.puck.carrier.vel, Vector.mult(dir, passPower));
         this.puck.pos = Vector.add(this.puck.pos, Vector.mult(dir, this.puck.radius + this.puck.carrier.radius + 2));
         this.puck.carrier.hasPuck = false;
@@ -383,32 +419,34 @@ class Game {
             p.render(this.ctx, i === this.controlledPlayerIndex);
         });
 
-        // Draw Aiming Line (Green cone)
-        if (this.input.action.touchId !== null && this.controlledPlayerIndex !== -1 && this.players[this.controlledPlayerIndex].hasPuck) {
-            const p = this.players[this.controlledPlayerIndex];
-            const worldX = this.input.action.current.x + this.camera.x;
-            const worldY = this.input.action.current.y + this.camera.y;
-            
-            this.ctx.beginPath();
-            this.ctx.moveTo(this.puck.pos.x, this.puck.pos.y);
-            this.ctx.lineTo(worldX, worldY);
-            
-            // Neon green stroke with glow
-            this.ctx.shadowBlur = 10;
-            this.ctx.shadowColor = '#00ff00';
-            this.ctx.strokeStyle = '#00ff00';
-            this.ctx.lineWidth = 6;
-            this.ctx.stroke();
-            this.ctx.shadowBlur = 0;
-            
-            // Dot at end
-            this.ctx.beginPath();
-            this.ctx.arc(worldX, worldY, 8, 0, Math.PI * 2);
-            this.ctx.fillStyle = '#00ff00';
-            this.ctx.fill();
-            this.ctx.strokeStyle = '#000';
-            this.ctx.lineWidth = 2;
-            this.ctx.stroke();
+        // Draw Aiming Line (Green cone) based on joystick
+        if (this.input.joystick.active && this.controlledPlayerIndex !== -1 && this.players[this.controlledPlayerIndex].hasPuck) {
+            const dir = this.input.joystick.vector;
+            if (this.input.joystick.magnitude > 0.1) {
+                const worldX = this.puck.pos.x + dir.x * 150;
+                const worldY = this.puck.pos.y + dir.y * 150;
+                
+                this.ctx.beginPath();
+                this.ctx.moveTo(this.puck.pos.x, this.puck.pos.y);
+                this.ctx.lineTo(worldX, worldY);
+                
+                // Neon green stroke with glow
+                this.ctx.shadowBlur = 10;
+                this.ctx.shadowColor = '#00ff00';
+                this.ctx.strokeStyle = '#00ff00';
+                this.ctx.lineWidth = 6;
+                this.ctx.stroke();
+                this.ctx.shadowBlur = 0;
+                
+                // Dot at end
+                this.ctx.beginPath();
+                this.ctx.arc(worldX, worldY, 8, 0, Math.PI * 2);
+                this.ctx.fillStyle = '#00ff00';
+                this.ctx.fill();
+                this.ctx.strokeStyle = '#111';
+                this.ctx.lineWidth = 2;
+                this.ctx.stroke();
+            }
         }
 
         this.ctx.restore();
@@ -417,17 +455,6 @@ class Game {
     }
 
     renderVirtualJoystick() {
-        const thresholdY = this.height * (1 - this.input.joystickZoneHeight);
-
-        // Grey action zone box
-        this.ctx.save();
-        this.ctx.fillStyle = 'rgba(0, 0, 0, 0.1)';
-        this.ctx.fillRect(40, thresholdY + 20, this.width - 80, this.height - thresholdY - 40);
-        this.ctx.strokeStyle = 'rgba(0, 0, 0, 0.2)';
-        this.ctx.lineWidth = 2;
-        this.ctx.strokeRect(40, thresholdY + 20, this.width - 80, this.height - thresholdY - 40);
-        this.ctx.restore();
-
         if (!this.input.joystick.active) return;
 
         const { origin, current } = this.input.joystick;
