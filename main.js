@@ -32,12 +32,16 @@ class Game {
 
     resize() {
         // Fix internal viewport width to 360 to match standard mobile zoom
-        // This ensures the camera pans horizontally across the 800-width rink
         this.width = 360;
         // Scale height proportionally to screen aspect ratio
-        this.height = Math.floor(this.width * (window.innerHeight / window.innerWidth));
-        this.canvas.width = this.width;
-        this.canvas.height = this.height;
+        const newHeight = Math.floor(this.width * (window.innerHeight / window.innerWidth));
+        
+        // Only reassign canvas dimensions if they changed, as assignment clears the canvas buffer (causes flickering)
+        if (this.canvas.width !== this.width || this.canvas.height !== newHeight) {
+            this.height = newHeight;
+            this.canvas.width = this.width;
+            this.canvas.height = this.height;
+        }
     }
 
     setupMatch(teamSize) {
