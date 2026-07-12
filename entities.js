@@ -1,487 +1,421 @@
-import { Vector, Collision } from './physics.js';
-
-function drawRoundRect(ctx, x, y, width, height, radius) {
+// Portable rounded-rect path helper (works on all mobile browsers)
+function rrect(ctx, x, y, w, h, r) {
     ctx.beginPath();
-    ctx.moveTo(x + radius, y);
-    ctx.lineTo(x + width - radius, y);
-    ctx.quadraticCurveTo(x + width, y, x + width, y + radius);
-    ctx.lineTo(x + width, y + height - radius);
-    ctx.quadraticCurveTo(x + width, y + height, x + width - radius, y + height);
-    ctx.lineTo(x + radius, y + height);
-    ctx.quadraticCurveTo(x, y + height, x, y + height - radius);
-    ctx.lineTo(x, y + radius);
-    ctx.quadraticCurveTo(x, y, x + radius, y);
+    ctx.moveTo(x + r, y);
+    ctx.lineTo(x + w - r, y);
+    ctx.arcTo(x + w, y, x + w, y + r, r);
+    ctx.lineTo(x + w, y + h - r);
+    ctx.arcTo(x + w, y + h, x + w - r, y + h, r);
+    ctx.lineTo(x + r, y + h);
+    ctx.arcTo(x, y + h, x, y + h - r, r);
+    ctx.lineTo(x, y + r);
+    ctx.arcTo(x, y, x + r, y, r);
     ctx.closePath();
 }
 
-export class Entity {
-    constructor(x, y, radius, mass) {
+// ─── PUCK ────────────────────────────────────────────────────────────────────
+export class Puck {
+    constructor(x, y) {
         this.pos = { x, y };
         this.vel = { x: 0, y: 0 };
-        this.acc = { x: 0, y: 0 };
-        this.radius = radius;
-        this.mass = mass;
-        this.restitution = 0.5;
-        this.friction = 0.98; // Ice friction
-        this.maxSpeed = 5;
-    }
-
-    applyForce(force) {
-        const f = Vector.div(force, this.mass);
-        this.acc = Vector.add(this.acc, f);
-    }
-
-    update(dt) {
-        this.vel = Vector.add(this.vel, this.acc);
-        this.vel = Vector.limit(this.vel, this.maxSpeed);
-        // Apply friction
-        this.vel = Vector.mult(this.vel, this.friction);
-        
-        // Position update using velocity (assuming dt is somewhat constant, simplified integration)
-        // For true independence, multiply by dt * speedFactor
-        this.pos.x += this.vel.x * dt * 60; 
-        this.pos.y += this.vel.y * dt * 60;
-        
-        this.acc = { x: 0, y: 0 };
-    }
-}
-
-export class Player extends Entity {
-    constructor(x, y, team, id, isGoalie = false) {
-        super(x, y, isGoalie ? 18 : 15, 10);
-        this.team = team; // 0 for player, 1 for opponent
-        this.id = id;
-        this.isGoalie = isGoalie;
-        this.maxSpeed = isGoalie ? 4.0 : 8.0; // Increased speed
-        this.restitution = 0.2;
-        this.hasPuck = false;
-        this.stunTimer = 0;
-        this.state = 'IDLE'; // IDLE, SEEK, PURSUIT, DEFEND
-        
-        this.color = team === 0 ? '#333' : '#fff';
-        this.outline = team === 0 ? '#8b1c1c' : '#1c268b';
-    }
-
-    update(dt) {
-        if (this.stunTimer > 0) {
-            this.stunTimer -= dt;
-            this.maxSpeed = this.isGoalie ? 2.0 : 3.5; // Slowed down while recovering
-        } else {
-            this.maxSpeed = this.isGoalie ? 4.0 : 8.0;
-        }
-        super.update(dt);
-    }
-
-    render(ctx, isControlled) {
-        // Shoulders (rounded rect)
-        ctx.save();
-        ctx.translate(this.pos.x, this.pos.y);
-        const heading = Vector.mag(this.vel) > 0.1 ? Math.atan2(this.vel.y, this.vel.x) : (this.team === 0 ? -Math.PI/2 : Math.PI/2);
-        ctx.rotate(heading);
-
-        // Stick
-        ctx.beginPath();
-        ctx.moveTo(15, 5); // Originating from hands
-        ctx.lineTo(30, 20);
-        ctx.lineTo(35, 15); // Blade
-        ctx.strokeStyle = '#4a3b2c'; // Dark wood
-        ctx.lineWidth = 4;
-        ctx.lineJoin = 'round';
-        ctx.lineCap = 'round';
-        ctx.stroke();
-
-        // Shoulders
-        drawRoundRect(ctx, -12, -16, 24, 32, 8);
-        ctx.fillStyle = this.color;
-        ctx.fill();
-        ctx.lineWidth = 2;
-        ctx.strokeStyle = '#000';
-        ctx.stroke();
-        
-        // Helmet
-        ctx.beginPath();
-        ctx.arc(0, -2, 9, 0, Math.PI * 2);
-        ctx.fillStyle = this.team === 0 ? '#222' : '#fff';
-        ctx.fill();
-        ctx.stroke();
-
-        // Helmet stripe
-        ctx.beginPath();
-        ctx.moveTo(0, -11);
-        ctx.lineTo(0, 7);
-        ctx.strokeStyle = this.team === 0 ? '#fff' : '#222';
-        ctx.lineWidth = 3;
-        ctx.stroke();
-
-        // Number on back
-        ctx.rotate(-heading); // Keep text upright
-        ctx.fillStyle = this.team === 0 ? '#fff' : '#000';
-        ctx.font = 'bold 11px Oswald';
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.fillText(this.id, 0, 0);
-        
-        ctx.restore();
-
-        // Highlight ring & Name
-        if (isControlled) {
-            ctx.beginPath();
-            ctx.arc(this.pos.x, this.pos.y, this.radius + 10, 0, Math.PI * 2);
-            ctx.strokeStyle = '#ff3333'; // Bright red ring
-            ctx.lineWidth = 4;
-            ctx.stroke();
-
-            // Name plate background
-            const names = ['SMITH', 'JOHNSON', 'WILLIAMS', 'BROWN', 'JONES', 'MILLER', 'DAVIS', 'GARCIA', 'RODRIGUEZ', 'WILSON'];
-            const pName = 'J. ' + names[this.id % names.length];
-            ctx.font = 'bold 12px Oswald';
-            const textWidth = ctx.measureText(pName).width;
-
-            ctx.fillStyle = '#65c2db';
-            drawRoundRect(ctx, this.pos.x - textWidth/2 - 6, this.pos.y + this.radius + 12, textWidth + 12, 16, 4);
-            ctx.fill();
-            ctx.strokeStyle = '#fff';
-            ctx.lineWidth = 1.5;
-            ctx.stroke();
-            
-            // Text
-            ctx.fillStyle = '#000';
-            ctx.fillText(pName, this.pos.x, this.pos.y + this.radius + 21);
-        }
-    }
-
-    // Steering Behaviors
-    seek(target) {
-        const desired = Vector.sub(target, this.pos);
-        const dmag = Vector.mag(desired);
-        if (dmag === 0) return { x: 0, y: 0 };
-        const normDesired = Vector.mult(Vector.normalize(desired), this.maxSpeed);
-        return Vector.limit(Vector.sub(normDesired, this.vel), 0.6); // max force
-    }
-
-    arrive(target, slowdownRadius) {
-        const desired = Vector.sub(target, this.pos);
-        const d = Vector.mag(desired);
-        if (d < 0.1) return { x: 0, y: 0 };
-        
-        let speed = this.maxSpeed;
-        if (d < slowdownRadius) {
-            speed = this.maxSpeed * (d / slowdownRadius);
-        }
-        
-        const normDesired = Vector.mult(Vector.normalize(desired), speed);
-        return Vector.limit(Vector.sub(normDesired, this.vel), 0.6);
-    }
-}
-
-export class Puck extends Entity {
-    constructor(x, y) {
-        super(x, y, 6, 2);
-        this.friction = 0.99; // Less friction, slides more
-        this.maxSpeed = 15;
-        this.restitution = 0.8; // Bouncy
+        this.radius = 7;
+        this.mass = 0.3;
+        this.friction = 0.985; // ice glide
         this.carrier = null;
     }
 
+    update(dt) {
+        this.vel.x *= this.friction;
+        this.vel.y *= this.friction;
+        this.pos.x += this.vel.x;
+        this.pos.y += this.vel.y;
+    }
+
     render(ctx) {
+        ctx.save();
         ctx.beginPath();
         ctx.arc(this.pos.x, this.pos.y, this.radius, 0, Math.PI * 2);
         ctx.fillStyle = '#111';
         ctx.fill();
-        ctx.lineWidth = 1;
         ctx.strokeStyle = '#555';
+        ctx.lineWidth = 1.5;
         ctx.stroke();
-        
-        // Lighting reflection dot
-        ctx.beginPath();
-        ctx.arc(this.pos.x - 2, this.pos.y - 2, 2, 0, Math.PI * 2);
-        ctx.fillStyle = 'rgba(255,255,255,0.4)';
-        ctx.fill();
+        ctx.restore();
     }
 }
 
+// ─── PLAYER ──────────────────────────────────────────────────────────────────
+const PLAYER_NAMES = ['SMITH', 'JONES', 'MILLER', 'DAVIS', 'BROWN', 'TAYLOR', 'WILSON', 'MOORE', 'ANDERSON', 'THOMAS'];
+
+export class Player {
+    constructor(x, y, team, number, isGoalie = false) {
+        this.pos = { x, y };
+        this.vel = { x: 0, y: 0 };
+        this.radius = isGoalie ? 14 : 12;
+        this.mass = isGoalie ? 3 : 2;
+        this.team = team;           // 0 = human team, 1 = AI team
+        this.number = number;
+        this.isGoalie = isGoalie;
+        this.hasPuck = false;
+        this.stunTimer = 0;
+
+        this.maxSpeed = isGoalie ? 4.5 : 6.5;
+        this.friction = 0.84;       // skate feel
+
+        // Facing angle (radians). Starts facing up for team0, down for team1
+        this.angle = team === 0 ? -Math.PI / 2 : Math.PI / 2;
+
+        // Team colours
+        this.colorBody  = team === 0 ? '#c0392b' : '#2980b9';
+        this.colorAccent = team === 0 ? '#fff'   : '#fff';
+    }
+
+    applyForce(fx, fy) {
+        this.vel.x += fx / this.mass;
+        this.vel.y += fy / this.mass;
+    }
+
+    update(dt) {
+        if (this.stunTimer > 0) this.stunTimer -= dt;
+
+        // Apply friction
+        this.vel.x *= this.friction;
+        this.vel.y *= this.friction;
+
+        // Clamp speed
+        const spd = Math.sqrt(this.vel.x * this.vel.x + this.vel.y * this.vel.y);
+        if (spd > this.maxSpeed) {
+            this.vel.x = (this.vel.x / spd) * this.maxSpeed;
+            this.vel.y = (this.vel.y / spd) * this.maxSpeed;
+        }
+
+        this.pos.x += this.vel.x;
+        this.pos.y += this.vel.y;
+
+        // Rotate to face movement direction smoothly
+        if (spd > 0.3) {
+            const targetAngle = Math.atan2(this.vel.y, this.vel.x);
+            let delta = targetAngle - this.angle;
+            while (delta > Math.PI)  delta -= Math.PI * 2;
+            while (delta < -Math.PI) delta += Math.PI * 2;
+            this.angle += delta * 0.25;
+        }
+    }
+
+    render(ctx, isControlled) {
+        ctx.save();
+        ctx.translate(this.pos.x, this.pos.y);
+        ctx.rotate(this.angle + Math.PI / 2); // sprite faces "up"
+
+        // Shadow
+        ctx.beginPath();
+        ctx.ellipse(2, 4, this.radius, this.radius * 0.5, 0, 0, Math.PI * 2);
+        ctx.fillStyle = 'rgba(0,0,0,0.25)';
+        ctx.fill();
+
+        // Jersey body
+        rrect(ctx, -10, -14, 20, 28, 7);
+        ctx.fillStyle = this.colorBody;
+        ctx.fill();
+        ctx.strokeStyle = this.colorAccent;
+        ctx.lineWidth = 2;
+        ctx.stroke();
+
+        // Helmet
+        ctx.beginPath();
+        ctx.arc(0, -14, 9, Math.PI, Math.PI * 2);
+        ctx.fillStyle = this.colorBody;
+        ctx.fill();
+        ctx.strokeStyle = this.colorAccent;
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
+
+        // Visor stripe
+        ctx.beginPath();
+        ctx.moveTo(-9, -14);
+        ctx.lineTo(9, -14);
+        ctx.strokeStyle = 'rgba(255,255,255,0.5)';
+        ctx.lineWidth = 3;
+        ctx.stroke();
+
+        // Number
+        ctx.rotate(0);
+        ctx.fillStyle = '#fff';
+        ctx.font = `bold ${this.isGoalie ? 10 : 9}px Oswald`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(this.number, 0, 4);
+
+        // Stick
+        ctx.strokeStyle = '#5d3a1a';
+        ctx.lineWidth = 2.5;
+        ctx.beginPath();
+        ctx.moveTo(9, 0);
+        ctx.lineTo(16, 14);
+        ctx.lineTo(14, 20);
+        ctx.stroke();
+
+        ctx.restore();
+
+        // Controlled-player highlight ring
+        if (isControlled) {
+            ctx.save();
+            ctx.beginPath();
+            ctx.arc(this.pos.x, this.pos.y, this.radius + 8, 0, Math.PI * 2);
+            ctx.strokeStyle = '#ffe500';
+            ctx.lineWidth = 3;
+            ctx.setLineDash([5, 5]);
+            ctx.stroke();
+            ctx.setLineDash([]);
+
+            // Name tag
+            const name = 'J. ' + PLAYER_NAMES[this.number % PLAYER_NAMES.length];
+            ctx.font = 'bold 10px Oswald';
+            const tw = ctx.measureText(name).width;
+            const tx = this.pos.x - tw / 2 - 5;
+            const ty = this.pos.y + this.radius + 14;
+            rrect(ctx, tx, ty, tw + 10, 15, 4);
+            ctx.fillStyle = 'rgba(0,0,0,0.7)';
+            ctx.fill();
+            ctx.fillStyle = '#ffe500';
+            ctx.fillText(name, this.pos.x, ty + 7.5);
+            ctx.restore();
+        }
+    }
+
+    // Steering helpers used by AI
+    _seek(tx, ty) {
+        const dx = tx - this.pos.x, dy = ty - this.pos.y;
+        const d = Math.sqrt(dx * dx + dy * dy);
+        if (d === 0) return;
+        const force = 0.8;
+        this.applyForce((dx / d) * force, (dy / d) * force);
+    }
+
+    _arrive(tx, ty, slowR = 60) {
+        const dx = tx - this.pos.x, dy = ty - this.pos.y;
+        const d = Math.sqrt(dx * dx + dy * dy);
+        if (d === 0) return;
+        const speed = d < slowR ? (d / slowR) * this.maxSpeed : this.maxSpeed;
+        const force = 0.6;
+        this.applyForce((dx / d) * force * (speed / this.maxSpeed),
+                        (dy / d) * force * (speed / this.maxSpeed));
+    }
+}
+
+// ─── RINK ────────────────────────────────────────────────────────────────────
 export class Rink {
-    constructor(width, height) {
-        this.width = width;
-        this.height = height;
-        this.boardsRadius = 80;
-        this.goalWidth = 120;
-        this.goalOffset = 100;
-        this.goalDepth = 30;
+    constructor() {
+        // World dimensions
+        this.w = 500;
+        this.h = 900;
+        this.R = 70;                    // corner radius of rink oval
+
+        // Goal geometry (in world coords)
+        this.goalW = 90;                // opening width
+        this.goalD = 28;                // depth
+        this.goalLineY0 = 80;           // top goal line Y
+        this.goalLineY1 = this.h - 80;  // bottom goal line Y
     }
 
-    // Handle collision with outer boards (including rounded corners)
-    collideBoards(entity) {
-        let collided = false;
-        const r = this.boardsRadius;
-        const eR = entity.radius;
+    // Confine an entity to the rink. Returns true if a wall bounce happened.
+    confine(entity) {
+        const r = entity.radius;
+        let bounced = false;
+        const { w, h, R } = this;
 
-        // 1. Basic AABB walls (straight sections)
-        if (entity.pos.x < eR && entity.pos.y >= r && entity.pos.y <= this.height - r) {
-            entity.pos.x = eR;
-            entity.vel.x *= -entity.restitution;
-            collided = true;
-        } else if (entity.pos.x > this.width - eR && entity.pos.y >= r && entity.pos.y <= this.height - r) {
-            entity.pos.x = this.width - eR;
-            entity.vel.x *= -entity.restitution;
-            collided = true;
-        }
+        // Simple rectangular clamp first (handles most cases fast)
+        if (entity.pos.x - r < 0) { entity.pos.x = r; entity.vel.x = Math.abs(entity.vel.x) * 0.5; bounced = true; }
+        if (entity.pos.x + r > w) { entity.pos.x = w - r; entity.vel.x = -Math.abs(entity.vel.x) * 0.5; bounced = true; }
+        if (entity.pos.y - r < 0) { entity.pos.y = r; entity.vel.y = Math.abs(entity.vel.y) * 0.5; bounced = true; }
+        if (entity.pos.y + r > h) { entity.pos.y = h - r; entity.vel.y = -Math.abs(entity.vel.y) * 0.5; bounced = true; }
 
-        if (entity.pos.y < eR && entity.pos.x >= r && entity.pos.x <= this.width - r) {
-            entity.pos.y = eR;
-            entity.vel.y *= -entity.restitution;
-            collided = true;
-        } else if (entity.pos.y > this.height - eR && entity.pos.x >= r && entity.pos.x <= this.width - r) {
-            entity.pos.y = this.height - eR;
-            entity.vel.y *= -entity.restitution;
-            collided = true;
-        }
-
-        // 2. Rounded Corners
-        const checkCorner = (cx, cy) => {
-            const dx = entity.pos.x - cx;
-            const dy = entity.pos.y - cy;
-            const dist = Math.sqrt(dx * dx + dy * dy);
-            if (dist > r - eR) {
-                const overlap = dist - (r - eR);
-                const nx = dx / dist;
-                const ny = dy / dist;
-                
-                entity.pos.x -= nx * overlap;
-                entity.pos.y -= ny * overlap;
-                
-                const dot = entity.vel.x * nx + entity.vel.y * ny;
-                if (dot > 0) {
-                    entity.vel.x -= (1 + entity.restitution) * dot * nx;
-                    entity.vel.y -= (1 + entity.restitution) * dot * ny;
+        // Corner arcs: push entity away from corner centers
+        const corners = [
+            { cx: R, cy: R },
+            { cx: w - R, cy: R },
+            { cx: R, cy: h - R },
+            { cx: w - R, cy: h - R }
+        ];
+        for (const c of corners) {
+            const dx = entity.pos.x - c.cx;
+            const dy = entity.pos.y - c.cy;
+            const d = Math.sqrt(dx * dx + dy * dy);
+            const minD = R - r;
+            if (d < minD && d > 0) {
+                const nx = dx / d, ny = dy / d;
+                entity.pos.x = c.cx + nx * minD;
+                entity.pos.y = c.cy + ny * minD;
+                const vn = entity.vel.x * nx + entity.vel.y * ny;
+                if (vn < 0) {
+                    entity.vel.x -= 1.5 * vn * nx;
+                    entity.vel.y -= 1.5 * vn * ny;
                 }
-                collided = true;
+                bounced = true;
             }
-        };
-
-        if (entity.pos.x < r && entity.pos.y < r) checkCorner(r, r); // Top-left
-        if (entity.pos.x > this.width - r && entity.pos.y < r) checkCorner(this.width - r, r); // Top-right
-        if (entity.pos.x < r && entity.pos.y > this.height - r) checkCorner(r, this.height - r); // Bottom-left
-        if (entity.pos.x > this.width - r && entity.pos.y > this.height - r) checkCorner(this.width - r, this.height - r); // Bottom-right
-
-        return collided;
+        }
+        return bounced;
     }
 
+    // Returns which team scored (0 or 1), or -1
     checkGoal(puck) {
-        const gw = this.goalWidth / 2;
-        // Top goal (Team 1 defends, Team 0 scores)
-        if (puck.pos.y < this.goalOffset && puck.pos.y > this.goalOffset - this.goalDepth && puck.pos.x > this.width / 2 - gw && puck.pos.x < this.width / 2 + gw) return 0;
-        // Bottom goal
-        if (puck.pos.y > this.height - this.goalOffset && puck.pos.y < this.height - this.goalOffset + this.goalDepth && puck.pos.x > this.width / 2 - gw && puck.pos.x < this.width / 2 + gw) return 1;
-        
+        const hw = this.goalW / 2;
+        const cx = this.w / 2;
+
+        // Top goal: team 0 scores (puck entered from below goal line and is inside depth)
+        if (puck.pos.y < this.goalLineY0 &&
+            puck.pos.y > this.goalLineY0 - this.goalD &&
+            Math.abs(puck.pos.x - cx) < hw) {
+            return 0;
+        }
+        // Bottom goal: team 1 scores
+        if (puck.pos.y > this.goalLineY1 &&
+            puck.pos.y < this.goalLineY1 + this.goalD &&
+            Math.abs(puck.pos.x - cx) < hw) {
+            return 1;
+        }
         return -1;
     }
 
     render(ctx) {
-        const cx = this.width / 2;
-        const cy = this.height / 2;
+        const { w, h, R } = this;
+        const cx = w / 2, cy = h / 2;
 
-        // Draw Stadium Seats Background (Rows)
-        ctx.fillStyle = '#222';
-        ctx.fillRect(-1000, -1000, this.width + 2000, this.height + 2000);
-        ctx.strokeStyle = '#333';
-        ctx.lineWidth = 10;
-        for (let i = 0; i < 20; i++) {
-            drawRoundRect(ctx, -200 - i * 50, -200 - i * 50, this.width + 400 + i * 100, this.height + 400 + i * 100, this.boardsRadius + 100 + i * 50);
+        // ── Stadium background (dark)
+        ctx.fillStyle = '#1a1a2e';
+        ctx.fillRect(-500, -500, w + 1000, h + 1000);
+
+        // Concentric crowd rows
+        ctx.strokeStyle = 'rgba(80,80,80,0.6)';
+        ctx.lineWidth = 8;
+        for (let i = 1; i <= 12; i++) {
+            const pad = i * 40;
+            rrect(ctx, -pad, -pad, w + pad * 2, h + pad * 2, R + pad);
             ctx.stroke();
         }
 
-        // Draw the rounded rink
-        const r = this.boardsRadius;
-        drawRoundRect(ctx, 0, 0, this.width, this.height, r);
-        ctx.fillStyle = '#eaf5fa'; // Ice color
+        // ── Ice surface
+        rrect(ctx, 0, 0, w, h, R);
+        const iceGrad = ctx.createLinearGradient(0, 0, 0, h);
+        iceGrad.addColorStop(0,   '#d8edf8');
+        iceGrad.addColorStop(0.5, '#e8f4fc');
+        iceGrad.addColorStop(1,   '#d8edf8');
+        ctx.fillStyle = iceGrad;
         ctx.fill();
-        
-        // Ice Spotlights (Soft gradients)
-        ctx.save();
-        ctx.globalCompositeOperation = 'screen';
-        const spots = [
-            {x: cx, y: cy}, {x: cx-200, y: cy-400}, {x: cx+200, y: cy-400},
-            {x: cx-200, y: cy+400}, {x: cx+200, y: cy+400}
-        ];
-        spots.forEach(s => {
-            const grad = ctx.createRadialGradient(s.x, s.y, 0, s.x, s.y, 300);
-            grad.addColorStop(0, 'rgba(255, 255, 255, 0.2)');
-            grad.addColorStop(1, 'rgba(255, 255, 255, 0)');
-            ctx.fillStyle = grad;
-            ctx.beginPath();
-            ctx.arc(s.x, s.y, 300, 0, Math.PI * 2);
-            ctx.fill();
-        });
-        ctx.restore();
 
-        // Thick Boards border
-        ctx.lineWidth = 12;
-        ctx.strokeStyle = '#fff'; // Boards (white)
-        ctx.stroke();
-
-        // Ad boards / Text on boards
+        // Save & clip to ice from here
         ctx.save();
-        ctx.clip(); // Keeps ads on the ice
-        
-        // Ads (Red text)
-        ctx.fillStyle = '#ff0000';
-        ctx.font = 'bold 24px Oswald';
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        
-        ctx.save();
-        ctx.translate(this.width / 2, 10);
-        ctx.rotate(Math.PI);
-        ctx.fillText("BIG IDEA GAMES", 0, 0);
-        ctx.restore();
-        
-        ctx.save();
-        ctx.translate(this.width / 2, this.height - 10);
-        ctx.fillText("SUPERSTAR HOCKEY", 0, 0);
-        ctx.restore();
-        ctx.restore();
-
-        // Clip all ice markings to not bleed out of the rounded rink
-        ctx.save();
+        rrect(ctx, 0, 0, w, h, R);
         ctx.clip();
 
-        // Center line (Red)
-        ctx.fillStyle = '#c9302c';
-        ctx.fillRect(0, cy - 4, this.width, 8);
-        
-        // Blue lines
-        ctx.fillStyle = '#0055a4';
-        ctx.fillRect(0, cy - 180, this.width, 8);
-        ctx.fillRect(0, cy + 180, this.width, 8);
-        
-        // Center circle
-        ctx.beginPath();
-        ctx.arc(cx, cy, 80, 0, Math.PI * 2);
+        // ── Ice markings
+        // Goal lines (red)
+        ctx.strokeStyle = '#c0392b';
         ctx.lineWidth = 3;
-        ctx.strokeStyle = '#0055a4';
-        ctx.stroke();
-        
-        // ROCKY MOUNTAIN Logo
-        ctx.save();
-        ctx.translate(cx, cy);
-        ctx.globalAlpha = 0.8;
-        // Shield outline
-        ctx.beginPath();
-        ctx.moveTo(0, -60);
-        ctx.lineTo(60, -30);
-        ctx.lineTo(60, 40);
-        ctx.lineTo(0, 70);
-        ctx.lineTo(-60, 40);
-        ctx.lineTo(-60, -30);
-        ctx.closePath();
-        ctx.fillStyle = '#fff';
-        ctx.fill();
-        ctx.strokeStyle = '#65c2db';
-        ctx.lineWidth = 4;
-        ctx.stroke();
-        // Mountains
-        ctx.fillStyle = '#65c2db';
-        ctx.beginPath();
-        ctx.moveTo(-56, 30);
-        ctx.lineTo(-20, -20);
-        ctx.lineTo(0, 5);
-        ctx.lineTo(30, -40);
-        ctx.lineTo(56, 30);
-        ctx.fill();
-        // Text
-        ctx.fillStyle = '#65c2db';
-        ctx.font = 'bold 16px Oswald';
-        ctx.textAlign = 'center';
-        ctx.strokeStyle = '#fff';
-        ctx.lineWidth = 3;
-        ctx.strokeText("ROCKY MOUNTAIN", 0, 50);
-        ctx.fillText("ROCKY MOUNTAIN", 0, 50);
-        ctx.restore();
+        ctx.beginPath(); ctx.moveTo(0, this.goalLineY0); ctx.lineTo(w, this.goalLineY0); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(0, this.goalLineY1); ctx.lineTo(w, this.goalLineY1); ctx.stroke();
 
-        // Goal lines (Red)
-        ctx.strokeStyle = '#c9302c';
+        // Blue lines
+        ctx.strokeStyle = '#2471a3';
+        ctx.lineWidth = 6;
+        const blueOff = 220;
+        ctx.beginPath(); ctx.moveTo(0, cy - blueOff); ctx.lineTo(w, cy - blueOff); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(0, cy + blueOff); ctx.lineTo(w, cy + blueOff); ctx.stroke();
+
+        // Red center line
+        ctx.strokeStyle = '#c0392b';
+        ctx.lineWidth = 5;
+        ctx.setLineDash([12, 8]);
+        ctx.beginPath(); ctx.moveTo(0, cy); ctx.lineTo(w, cy); ctx.stroke();
+        ctx.setLineDash([]);
+
+        // Center circle
+        ctx.strokeStyle = '#2471a3';
         ctx.lineWidth = 3;
-        ctx.beginPath();
-        ctx.moveTo(0, this.goalOffset);
-        ctx.lineTo(this.width, this.goalOffset);
-        ctx.stroke();
-        ctx.beginPath();
-        ctx.moveTo(0, this.height - this.goalOffset);
-        ctx.lineTo(this.width, this.height - this.goalOffset);
-        ctx.stroke();
-        
-        // Center dot
-        ctx.beginPath();
-        ctx.arc(cx, cy, 6, 0, Math.PI * 2);
-        ctx.fillStyle = '#0055a4';
-        ctx.fill();
+        ctx.beginPath(); ctx.arc(cx, cy, 70, 0, Math.PI * 2); ctx.stroke();
+        ctx.beginPath(); ctx.arc(cx, cy, 4,  0, Math.PI * 2); ctx.fillStyle = '#c0392b'; ctx.fill();
 
         // Faceoff dots
-        const drawDot = (dx, dy) => {
-            ctx.beginPath();
-            ctx.arc(cx + dx, cy + dy, 4, 0, Math.PI * 2);
-            ctx.fillStyle = '#c9302c';
-            ctx.fill();
-        };
-        drawDot(-150, -280);
-        drawDot(150, -280);
-        drawDot(-150, 280);
-        drawDot(150, 280);
-        
-        // Creases (Light blue fill, red border)
-        ctx.fillStyle = 'rgba(100, 150, 255, 0.2)';
-        ctx.strokeStyle = '#c9302c';
+        const fdots = [
+            [cx - 120, cy - 180], [cx + 120, cy - 180],
+            [cx - 120, cy + 180], [cx + 120, cy + 180],
+        ];
+        fdots.forEach(([fx, fy]) => {
+            ctx.beginPath(); ctx.arc(fx, fy, 5, 0, Math.PI * 2);
+            ctx.fillStyle = '#c0392b'; ctx.fill();
+            ctx.strokeStyle = '#c0392b'; ctx.lineWidth = 2;
+            ctx.beginPath(); ctx.arc(fx, fy, 35, 0, Math.PI * 2); ctx.stroke();
+        });
+
+        // Crease semicircles
+        ctx.fillStyle   = 'rgba(41,128,185,0.18)';
+        ctx.strokeStyle = '#c0392b';
+        ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.arc(cx, this.goalLineY0, 50, 0, Math.PI);           ctx.fill(); ctx.stroke();
+        ctx.beginPath(); ctx.arc(cx, this.goalLineY1, 50, Math.PI, Math.PI * 2); ctx.fill(); ctx.stroke();
+
+        // Center logo (shield)
+        ctx.save();
+        ctx.translate(cx, cy);
+        ctx.globalAlpha = 0.5;
+        ctx.fillStyle = '#2471a3';
+        ctx.beginPath();
+        ctx.moveTo(0, -45); ctx.lineTo(40, -20); ctx.lineTo(40, 25); ctx.lineTo(0, 50); ctx.lineTo(-40, 25); ctx.lineTo(-40, -20);
+        ctx.closePath(); ctx.fill();
+        ctx.globalAlpha = 1;
+        ctx.restore();
+
+        // ── Boards border (inside clip)
+        rrect(ctx, 0, 0, w, h, R);
+        ctx.strokeStyle = '#fff';
+        ctx.lineWidth = 14;
+        ctx.stroke();
+        ctx.strokeStyle = '#2471a3';
         ctx.lineWidth = 3;
-        
-        ctx.beginPath();
-        ctx.arc(cx, this.goalOffset, 45, 0, Math.PI);
-        ctx.fill();
         ctx.stroke();
 
+        ctx.restore(); // end ice clip
+
+        // ── Goals (drawn outside clip so they slightly protrude)
+        this._drawGoal(ctx, cx, this.goalLineY0, -1);  // top goal, opens upward
+        this._drawGoal(ctx, cx, this.goalLineY1,  1);  // bottom goal, opens downward
+    }
+
+    _drawGoal(ctx, cx, ly, dir) {
+        const hw = this.goalW / 2;
+        const d  = this.goalD;
+
+        // Net fill
+        ctx.fillStyle = 'rgba(220,220,220,0.35)';
         ctx.beginPath();
-        ctx.arc(cx, this.height - this.goalOffset, 45, Math.PI, Math.PI * 2);
+        ctx.moveTo(cx - hw, ly);
+        ctx.lineTo(cx - hw, ly - d * dir);
+        ctx.lineTo(cx + hw, ly - d * dir);
+        ctx.lineTo(cx + hw, ly);
         ctx.fill();
+
+        // Net grid lines
+        ctx.strokeStyle = 'rgba(180,180,180,0.6)';
+        ctx.lineWidth = 0.8;
+        ctx.setLineDash([3, 3]);
+        for (let x = cx - hw; x <= cx + hw; x += 12) {
+            ctx.beginPath(); ctx.moveTo(x, ly); ctx.lineTo(x, ly - d * dir); ctx.stroke();
+        }
+        for (let i = 1; i <= 3; i++) {
+            const gy = ly - (d / 3) * i * dir;
+            ctx.beginPath(); ctx.moveTo(cx - hw, gy); ctx.lineTo(cx + hw, gy); ctx.stroke();
+        }
+        ctx.setLineDash([]);
+
+        // Posts + crossbar
+        ctx.strokeStyle = '#e74c3c';
+        ctx.lineWidth = 4;
+        ctx.lineJoin = 'round';
+        ctx.beginPath();
+        ctx.moveTo(cx - hw, ly);
+        ctx.lineTo(cx - hw, ly - d * dir);
+        ctx.lineTo(cx + hw, ly - d * dir);
+        ctx.lineTo(cx + hw, ly);
         ctx.stroke();
-        
-        ctx.restore(); // remove clip
-
-        // Goals rendering
-        const drawGoal = (yOffset, dir) => {
-            // Netting
-            ctx.save();
-            ctx.beginPath();
-            ctx.moveTo(cx - this.goalWidth/2, yOffset);
-            ctx.lineTo(cx - this.goalWidth/2 + 5, yOffset - this.goalDepth * dir);
-            ctx.lineTo(cx + this.goalWidth/2 - 5, yOffset - this.goalDepth * dir);
-            ctx.lineTo(cx + this.goalWidth/2, yOffset);
-            ctx.fillStyle = 'rgba(255, 255, 255, 0.5)';
-            ctx.fill();
-            
-            // Netting grid
-            ctx.setLineDash([2, 2]);
-            ctx.strokeStyle = '#aaa';
-            ctx.lineWidth = 1;
-            for(let i=0; i<this.goalWidth; i+=6) {
-                ctx.beginPath(); ctx.moveTo(cx - this.goalWidth/2 + i, yOffset);
-                ctx.lineTo(cx - this.goalWidth/2 + i * 0.9, yOffset - this.goalDepth * dir); ctx.stroke();
-            }
-            
-            // Frame
-            ctx.setLineDash([]);
-            ctx.strokeStyle = '#d9534f'; // Red posts
-            ctx.lineWidth = 5;
-            ctx.lineJoin = 'round';
-            ctx.beginPath();
-            ctx.moveTo(cx - this.goalWidth/2, yOffset);
-            ctx.lineTo(cx - this.goalWidth/2 + 5, yOffset - this.goalDepth * dir);
-            ctx.lineTo(cx + this.goalWidth/2 - 5, yOffset - this.goalDepth * dir);
-            ctx.lineTo(cx + this.goalWidth/2, yOffset);
-            ctx.stroke();
-            ctx.restore();
-        };
-
-        drawGoal(this.goalOffset, 1); // Top
-        drawGoal(this.height - this.goalOffset, -1); // Bottom
     }
 }

@@ -5,91 +5,69 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="description" content="Arcade Hockey – fast mobile hockey game">
     <title>Arcade Hockey</title>
-    <link rel="manifest" href="manifest.json">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Oswald:wght@400;700;900&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
-    <div id="ui-layer">
-        <div id="scoreboard">
-            <div class="team-container team-red">
-                <span class="team-name">YOU</span>
-                <span class="team-score" id="score-home">0</span>
-                <div class="shots">
-                    <span>SHOTS</span>
-                    <span id="shots-home">0</span>
-                </div>
-            </div>
-            
-            <div class="time-container">
-                <span class="clock" id="clock">5:00</span>
-                <span class="period" id="period">1ST</span>
-            </div>
-            
-            <div class="team-container team-blue">
-                <div class="shots">
-                    <span>SHOTS</span>
-                    <span id="shots-away">0</span>
-                </div>
-                <span class="team-score" id="score-away">0</span>
-                <span class="team-name">OPP</span>
-            </div>
-            
-            <div class="pause-btn" id="pause-btn">
-                <div class="bar"></div>
-                <div class="bar"></div>
+
+<canvas id="game-canvas"></canvas>
+
+<div id="ui-layer">
+    <div id="scoreboard">
+        <div class="team-container team-red">
+            <span class="team-name">YOU</span>
+            <span class="team-score" id="score-home">0</span>
+            <div class="shots">
+                <span>SOG</span>
+                <span id="shots-home">0</span>
             </div>
         </div>
-        
-        <div id="goal-overlay" class="hidden">
-            <div class="goal-text">GOAL!</div>
+
+        <div class="time-container">
+            <span class="clock" id="clock">5:00</span>
+            <span class="period" id="period">1ST</span>
+        </div>
+
+        <div class="team-container team-blue">
+            <div class="shots">
+                <span>SOG</span>
+                <span id="shots-away">0</span>
+            </div>
+            <span class="team-score" id="score-away">0</span>
+            <span class="team-name">OPP</span>
+        </div>
+
+        <div class="pause-btn" id="pause-btn">
+            <div class="bar"></div>
+            <div class="bar"></div>
         </div>
     </div>
 
-    <canvas id="game-canvas"></canvas>
+    <div id="goal-overlay" class="hidden">
+        <div class="goal-text">GOAL!</div>
+    </div>
+</div>
 
-    <script type="module" src="main.js"></script>
-    <script type="module">
-        if ('serviceWorker' in navigator) {
-            window.addEventListener('load', () => {
-                navigator.serviceWorker.register('/sw.js').then(registration => {
-                    console.log('SW registered: ', registration);
-                }).catch(registrationError => {
-                    console.log('SW registration failed: ', registrationError);
-                });
-            });
-        }
-    </script>
-    <script>
-        window.onerror = function(msg, url, lineNo, columnNo, error) {
-            var errDiv = document.createElement('div');
-            errDiv.style.position = 'absolute';
-            errDiv.style.zIndex = '9999';
-            errDiv.style.background = 'red';
-            errDiv.style.color = 'white';
-            errDiv.style.padding = '20px';
-            errDiv.style.top = '50px';
-            errDiv.style.left = '10px';
-            errDiv.style.right = '10px';
-            errDiv.style.fontFamily = 'sans-serif';
-            errDiv.innerHTML = '<b>Error:</b> ' + msg + '<br>Line: ' + lineNo + '<br>Col: ' + columnNo;
-            document.body.appendChild(errDiv);
-            return false;
-        };
-        window.addEventListener("unhandledrejection", function(e) {
-            var errDiv = document.createElement('div');
-            errDiv.style.position = 'absolute';
-            errDiv.style.zIndex = '9999';
-            errDiv.style.background = 'red';
-            errDiv.style.color = 'white';
-            errDiv.style.padding = '20px';
-            errDiv.style.top = '150px';
-            errDiv.style.left = '10px';
-            errDiv.style.right = '10px';
-            errDiv.style.fontFamily = 'sans-serif';
-            errDiv.innerHTML = '<b>Promise Error:</b> ' + e.reason;
-            document.body.appendChild(errDiv);
-        });
-    </script>
+<script type="module" src="main.js"></script>
+
+<!-- On-screen error reporter (dev helper, harmless in prod) -->
+<script>
+window.onerror = function(msg, url, ln, col) {
+    const d = document.createElement('div');
+    d.style.cssText = 'position:fixed;z-index:9999;top:0;left:0;right:0;background:red;color:#fff;padding:14px;font:14px monospace;word-break:break-all';
+    d.innerHTML = '<b>JS Error</b><br>' + msg + '<br>Line ' + ln + ' Col ' + col;
+    document.body.appendChild(d);
+};
+window.addEventListener('unhandledrejection', function(e) {
+    const d = document.createElement('div');
+    d.style.cssText = 'position:fixed;z-index:9999;top:80px;left:0;right:0;background:#c0392b;color:#fff;padding:14px;font:14px monospace;word-break:break-all';
+    d.innerHTML = '<b>Promise Error</b><br>' + String(e.reason);
+    document.body.appendChild(d);
+});
+</script>
 </body>
 </html>

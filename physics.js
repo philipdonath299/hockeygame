@@ -1,60 +1,61 @@
 // Math & Physics utilities
 
 export const Vector = {
-    add: (v1, v2) => ({ x: v1.x + v2.x, y: v1.y + v2.y }),
-    sub: (v1, v2) => ({ x: v1.x - v2.x, y: v1.y - v2.y }),
-    mult: (v, scalar) => ({ x: v.x * scalar, y: v.y * scalar }),
-    div: (v, scalar) => ({ x: v.x / scalar, y: v.y / scalar }),
+    add: (a, b) => ({ x: a.x + b.x, y: a.y + b.y }),
+    sub: (a, b) => ({ x: a.x - b.x, y: a.y - b.y }),
+    mult: (v, s) => ({ x: v.x * s, y: v.y * s }),
     mag: (v) => Math.sqrt(v.x * v.x + v.y * v.y),
     normalize: (v) => {
-        const m = Vector.mag(v);
+        const m = Math.sqrt(v.x * v.x + v.y * v.y);
         return m === 0 ? { x: 0, y: 0 } : { x: v.x / m, y: v.y / m };
     },
-    dist: (v1, v2) => Math.sqrt(Math.pow(v2.x - v1.x, 2) + Math.pow(v2.y - v1.y, 2)),
-    limit: (v, max) => {
-        const m = Vector.mag(v);
-        if (m > max) {
-            return Vector.mult(Vector.normalize(v), max);
-        }
-        return { ...v };
-    }
-};
-
-export const Collision = {
-    circleCircle: (c1, c2) => {
-        const dist = Vector.dist(c1.pos, c2.pos);
-        return dist < (c1.radius + c2.radius);
+    dist: (a, b) => {
+        const dx = b.x - a.x, dy = b.y - a.y;
+        return Math.sqrt(dx * dx + dy * dy);
     },
-    
-    // Resolve collision between two circles (e.g. player and puck)
-    resolveElastic: (c1, c2) => {
-        const normal = Vector.normalize(Vector.sub(c1.pos, c2.pos));
-        const relativeVelocity = Vector.sub(c1.vel, c2.vel);
-        const velocityAlongNormal = relativeVelocity.x * normal.x + relativeVelocity.y * normal.y;
-        
-        // Do not resolve if velocities are separating
-        if (velocityAlongNormal > 0) return;
-
-        // Restitution (bounciness)
-        const e = Math.min(c1.restitution || 0.5, c2.restitution || 0.5);
-        
-        let j = -(1 + e) * velocityAlongNormal;
-        j /= 1 / c1.mass + 1 / c2.mass;
-
-        const impulse = Vector.mult(normal, j);
-
-        c1.vel = Vector.add(c1.vel, Vector.mult(impulse, 1 / c1.mass));
-        c2.vel = Vector.sub(c2.vel, Vector.mult(impulse, 1 / c2.mass));
-        
-        // Positional correction to prevent sinking
-        const percent = 0.8; // usually 0.2 to 0.8
-        const slop = 0.01; // usually 0.01 to 0.1
-        const penetration = (c1.radius + c2.radius) - Vector.dist(c1.pos, c2.pos);
-        if (penetration > slop) {
-            const correctionMag = (penetration / (1/c1.mass + 1/c2.mass)) * percent;
-            const correction = Vector.mult(normal, correctionMag);
-            c1.pos = Vector.add(c1.pos, Vector.mult(correction, 1/c1.mass));
-            c2.pos = Vector.sub(c2.pos, Vector.mult(correction, 1/c2.mass));
-        }
+    dot: (a, b) => a.x * b.x + a.y * b.y,
+    limit: (v, max) => {
+        const m = Math.sqrt(v.x * v.x + v.y * v.y);
+        if (m > max) return { x: (v.x / m) * max, y: (v.y / m) * max };
+        return { x: v.x, y: v.y };
     }
 };
+
+export function resolveCircleCollision(a, b) {
+    const dx = b.pos.x - a.pos.x;
+    const dy = b.pos.y - a.pos.y;
+    const dist = Math.sqrt(dx * dx + dy * dy);
+    const minDist = a.radius + b.radius;
+
+    if (dist >= minDist || dist === 0) return false;
+
+    // Normal vector
+    const nx = dx / dist;
+    const ny = dy / dist;
+
+    // Separate (push apart so they don't overlap)
+    const overlap = (minDist - dist) * 0.5;
+    a.pos.x -= nx * overlap;
+    a.pos.y -= ny * overlap;
+    b.pos.x += nx * overlap;
+    b.pos.y += ny * overlap;
+
+    // Relative velocity along normal
+    const dvx = b.vel.x - a.vel.x;
+    const dvy = b.vel.y - a.vel.y;
+    const vn = dvx * nx + dvy * ny;
+
+    // Already separating
+    if (vn > 0) return true;
+
+    const e = 0.4; // restitution
+    const totalMass = a.mass + b.mass;
+    const impulse = -(1 + e) * vn / totalMass;
+
+    a.vel.x -= impulse * b.mass * nx;
+    a.vel.y -= impulse * b.mass * ny;
+    b.vel.x += impulse * a.mass * nx;
+    b.vel.y += impulse * a.mass * ny;
+
+    return true;
+}

@@ -1,159 +1,177 @@
+// ─── GAME ENGINE ──────────────────────────────────────────────────────────────
 export class GameEngine {
     constructor(updateFn, renderFn) {
         this.updateFn = updateFn;
         this.renderFn = renderFn;
-        this.lastTime = performance.now();
+        this.running  = false;
+        this.lastTime = 0;
+        this.FIXED_DT = 1 / 60;
         this.accumulator = 0;
-        this.timestep = 1 / 60; // 60 updates per second (in seconds)
-        this.rafId = null;
-        this.running = false;
     }
 
     start() {
         if (this.running) return;
-        this.running = true;
+        this.running  = true;
         this.lastTime = performance.now();
-        this.rafId = requestAnimationFrame((t) => this.loop(t));
+        requestAnimationFrame(t => this._loop(t));
     }
 
-    stop() {
-        this.running = false;
-        cancelAnimationFrame(this.rafId);
-    }
+    stop() { this.running = false; }
 
-    loop(currentTime) {
+    _loop(now) {
         if (!this.running) return;
-        
-        this.rafId = requestAnimationFrame((t) => this.loop(t));
-        
-        let frameTime = (currentTime - this.lastTime) / 1000; // Convert to seconds
-        this.lastTime = currentTime;
-        
-        // Prevent spiral of death if tab is inactive
-        if (frameTime > 0.25) {
-            frameTime = 0.25;
+        requestAnimationFrame(t => this._loop(t));
+
+        let dt = (now - this.lastTime) / 1000;
+        this.lastTime = now;
+        if (dt > 0.2) dt = 0.2; // spiral-of-death guard
+
+        this.accumulator += dt;
+        while (this.accumulator >= this.FIXED_DT) {
+            this.updateFn(this.FIXED_DT);
+            this.accumulator -= this.FIXED_DT;
         }
-
-        this.accumulator += frameTime;
-
-        while (this.accumulator >= this.timestep) {
-            this.updateFn(this.timestep);
-            this.accumulator -= this.timestep;
-        }
-
-        // Pass interpolation alpha for smooth rendering
-        const alpha = this.accumulator / this.timestep;
-        this.renderFn(alpha);
+        this.renderFn(this.accumulator / this.FIXED_DT);
     }
 }
 
+// ─── INPUT MANAGER ────────────────────────────────────────────────────────────
 export class InputManager {
     constructor(canvas) {
         this.canvas = canvas;
-        
-        // State
+
         this.joystick = {
-            active: false,
-            touchId: null,
-            origin: { x: 0, y: 0 },
-            current: { x: 0, y: 0 },
-            vector: { x: 0, y: 0 }, // Normalized direction
-            magnitude: 0, // 0 to 1
-            startTime: 0
+            active:    false,
+            touchId:   null,
+            originX:   0,
+            originY:   0,
+            dx:        0,   // clamped delta, pixels
+            dy:        0,
+            vx:        0,   // normalized direction
+            vy:        0,
+            mag:       0,   // 0..1
+            MAX_R:     55,
         };
 
-        // Event hooks
-        this.onJoystickRelease = null; // (vector, magnitude) => {}
+        this.onRelease = null; // (vx, vy, mag) callback
 
-        this.bindEvents();
+        // Bind events
+        const opts = { passive: false };
+        canvas.addEventListener('touchstart',  e => this._onStart(e),  opts);
+        canvas.addEventListener('touchmove',   e => this._onMove(e),   opts);
+        canvas.addEventListener('touchend',    e => this._onEnd(e),    opts);
+        canvas.addEventListener('touchcancel', e => this._onEnd(e),    opts);
     }
 
-    bindEvents() {
-        // passive: false is required to allow e.preventDefault()
-        this.canvas.addEventListener('touchstart', this.handleTouchStart.bind(this), { passive: false });
-        this.canvas.addEventListener('touchmove', this.handleTouchMove.bind(this), { passive: false });
-        this.canvas.addEventListener('touchend', this.handleTouchEnd.bind(this), { passive: false });
-        this.canvas.addEventListener('touchcancel', this.handleTouchEnd.bind(this), { passive: false });
+    _canvasPoint(touch) {
+        const r  = this.canvas.getBoundingClientRect();
+        const sx = this.canvas.width  / r.width;
+        const sy = this.canvas.height / r.height;
+        return {
+            x: (touch.clientX - r.left) * sx,
+            y: (touch.clientY - r.top)  * sy,
+        };
     }
 
-    handleTouchStart(e) {
+    _onStart(e) {
         e.preventDefault();
-        const rect = this.canvas.getBoundingClientRect();
+        for (const t of e.changedTouches) {
+            // Only accept touches on the LEFT 65% of the canvas
+            const r = this.canvas.getBoundingClientRect();
+            if (t.clientX - r.left > r.width * 0.65) continue;
+            if (this.joystick.active) continue;
 
-        for (let i = 0; i < e.changedTouches.length; i++) {
-            const touch = e.changedTouches[i];
-            const scaleX = this.canvas.width / rect.width;
-            const scaleY = this.canvas.height / rect.height;
-            const x = (touch.clientX - rect.left) * scaleX;
-            const y = (touch.clientY - rect.top) * scaleY;
-
-            // Restrict joystick origin to the left half of the screen
-            if (touch.clientX - rect.left < rect.width * 0.6) {
-                if (!this.joystick.active) {
-                    this.joystick.active = true;
-                    this.joystick.touchId = touch.identifier;
-                    this.joystick.origin = { x, y };
-                    this.joystick.current = { x, y };
-                    this.joystick.startTime = performance.now();
-                    this.updateJoystick();
-                }
-            }
+            const p = this._canvasPoint(t);
+            this.joystick.active  = true;
+            this.joystick.touchId = t.identifier;
+            this.joystick.originX = p.x;
+            this.joystick.originY = p.y;
+            this._update(p.x, p.y);
         }
     }
 
-    handleTouchMove(e) {
+    _onMove(e) {
         e.preventDefault();
-        const rect = this.canvas.getBoundingClientRect();
-
-        for (let i = 0; i < e.changedTouches.length; i++) {
-            const touch = e.changedTouches[i];
-            const scaleX = this.canvas.width / rect.width;
-            const scaleY = this.canvas.height / rect.height;
-            const x = (touch.clientX - rect.left) * scaleX;
-            const y = (touch.clientY - rect.top) * scaleY;
-
-            if (touch.identifier === this.joystick.touchId) {
-                this.joystick.current = { x, y };
-                this.updateJoystick();
-            }
+        for (const t of e.changedTouches) {
+            if (t.identifier !== this.joystick.touchId) continue;
+            const p = this._canvasPoint(t);
+            this._update(p.x, p.y);
         }
     }
 
-    handleTouchEnd(e) {
+    _onEnd(e) {
         e.preventDefault();
-        
-        for (let i = 0; i < e.changedTouches.length; i++) {
-            const touch = e.changedTouches[i];
-
-            if (touch.identifier === this.joystick.touchId) {
-                // Dispatch release event before clearing state
-                if (this.onJoystickRelease && this.joystick.magnitude > 0.1) {
-                    this.onJoystickRelease(this.joystick.vector, this.joystick.magnitude);
-                }
-
-                this.joystick.active = false;
-                this.joystick.touchId = null;
-                this.joystick.vector = { x: 0, y: 0 };
-                this.joystick.magnitude = 0;
+        for (const t of e.changedTouches) {
+            if (t.identifier !== this.joystick.touchId) continue;
+            if (this.onRelease && this.joystick.mag > 0.1) {
+                this.onRelease(this.joystick.vx, this.joystick.vy, this.joystick.mag);
             }
+            this.joystick.active  = false;
+            this.joystick.touchId = null;
+            this.joystick.dx      = 0;
+            this.joystick.dy      = 0;
+            this.joystick.vx      = 0;
+            this.joystick.vy      = 0;
+            this.joystick.mag     = 0;
         }
     }
 
-    updateJoystick() {
-        const dx = this.joystick.current.x - this.joystick.origin.x;
-        const dy = this.joystick.current.y - this.joystick.origin.y;
-        const dist = Math.sqrt(dx * dx + dy * dy);
-        
-        // Maximum pixels the joystick can move from origin
-        const maxRadius = 50; 
-        
+    _update(x, y) {
+        const js = this.joystick;
+        let rawDx = x - js.originX;
+        let rawDy = y - js.originY;
+        const dist = Math.sqrt(rawDx * rawDx + rawDy * rawDy);
+
         if (dist === 0) {
-            this.joystick.vector = { x: 0, y: 0 };
-            this.joystick.magnitude = 0;
+            js.vx = 0; js.vy = 0; js.mag = 0; js.dx = 0; js.dy = 0;
         } else {
-            const clampedDist = Math.min(dist, maxRadius);
-            this.joystick.vector = { x: dx / dist, y: dy / dist };
-            this.joystick.magnitude = clampedDist / maxRadius;
+            const clamped = Math.min(dist, js.MAX_R);
+            js.vx  = rawDx / dist;
+            js.vy  = rawDy / dist;
+            js.mag = clamped / js.MAX_R;
+            js.dx  = js.vx * clamped;
+            js.dy  = js.vy * clamped;
         }
+    }
+
+    renderJoystick(ctx) {
+        const js = this.joystick;
+        if (!js.active) return;
+
+        const ox = js.originX, oy = js.originY;
+        const nx = ox + js.dx, ny = oy + js.dy;
+
+        ctx.save();
+
+        // Outer ring
+        ctx.beginPath();
+        ctx.arc(ox, oy, js.MAX_R, 0, Math.PI * 2);
+        ctx.strokeStyle = 'rgba(255,255,255,0.18)';
+        ctx.lineWidth = 3;
+        ctx.stroke();
+        ctx.fillStyle = 'rgba(0,0,0,0.15)';
+        ctx.fill();
+
+        // Direction spoke
+        ctx.beginPath();
+        ctx.moveTo(ox, oy);
+        ctx.lineTo(nx, ny);
+        ctx.strokeStyle = 'rgba(255,255,255,0.3)';
+        ctx.lineWidth = 2;
+        ctx.stroke();
+
+        // Nub
+        const g = ctx.createRadialGradient(nx - 7, ny - 7, 2, nx, ny, 28);
+        g.addColorStop(0, 'rgba(255,255,255,0.9)');
+        g.addColorStop(1, 'rgba(180,180,180,0.55)');
+        ctx.beginPath();
+        ctx.arc(nx, ny, 28, 0, Math.PI * 2);
+        ctx.fillStyle = g;
+        ctx.fill();
+        ctx.strokeStyle = 'rgba(0,0,0,0.4)';
+        ctx.lineWidth = 2;
+        ctx.stroke();
+
+        ctx.restore();
     }
 }

@@ -1,170 +1,155 @@
-@import url('https://fonts.googleapis.com/css2?family=Oswald:wght@500;700&family=DotGothic16&display=swap');
-
-* {
+*, *::before, *::after {
     box-sizing: border-box;
     margin: 0;
     padding: 0;
-    -webkit-touch-callout: none;
-    -webkit-user-select: none;
-    user-select: none;
 }
 
-body, html {
+html, body {
     position: fixed;
-    top: 0;
-    left: 0;
+    inset: 0;
     width: 100%;
     height: 100%;
     overflow: hidden;
-    background-color: #111;
+    background: #0d0d14;
     font-family: 'Oswald', sans-serif;
-    touch-action: none; /* Prevent all browser default touch actions */
-    overscroll-behavior: none; /* Prevent scroll bouncing on iOS */
+    touch-action: none;
+    overscroll-behavior: none;
+    user-select: none;
+    -webkit-user-select: none;
 }
 
+/* ── Canvas fills the screen ── */
 #game-canvas {
     display: block;
     width: 100%;
     height: 100%;
-    touch-action: none;
+    image-rendering: pixelated;
+    image-rendering: crisp-edges;
 }
 
+/* ── UI layer sits on top ── */
 #ui-layer {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+}
+
+/* ── Scoreboard ── */
+#scoreboard {
     position: absolute;
     top: 0;
     left: 0;
-    width: 100%;
-    height: 100%;
-    pointer-events: none; /* Let touches pass through to canvas */
+    right: 0;
     display: flex;
-    flex-direction: column;
-}
-
-#scoreboard {
-    width: 100%;
-    /* Dark diagonal mesh pattern */
-    background: 
-        repeating-linear-gradient(45deg, rgba(0,0,0,0.2) 0, rgba(0,0,0,0.2) 2px, transparent 2px, transparent 4px),
-        linear-gradient(to bottom, #333, #1a1a1a);
-    color: white;
-    display: flex;
-    justify-content: space-between;
     align-items: center;
-    padding: env(safe-area-inset-top, 5px) 0 0 0; /* Flush with top/sides */
-    border-bottom: 2px solid #000;
-    box-shadow: 0 4px 6px rgba(0,0,0,0.5);
-    pointer-events: auto;
+    justify-content: space-between;
+    padding: 6px 10px;
+    background: linear-gradient(180deg, rgba(0,0,0,0.75) 0%, transparent 100%);
+    pointer-events: all;
 }
 
 .team-container {
     display: flex;
+    flex-direction: column;
     align-items: center;
-    height: 36px;
-}
-
-.team-red {
-    background-color: #b72c2c; /* Exact red */
-    border-right: 2px solid #000;
-}
-
-.team-blue {
-    background-color: #2b338b; /* Exact blue */
-    border-left: 2px solid #000;
+    min-width: 70px;
 }
 
 .team-name {
-    font-size: 14px;
+    font-size: 10px;
     font-weight: 700;
-    padding: 0 8px;
+    letter-spacing: 1.5px;
+    color: #aaa;
     text-transform: uppercase;
 }
 
 .team-score {
-    font-size: 26px;
-    font-weight: 700;
-    padding: 0 12px;
-    background: rgba(0, 0, 0, 0.4);
-    height: 100%;
-    display: flex;
-    align-items: center;
+    font-size: 34px;
+    font-weight: 900;
+    line-height: 1;
+    color: #fff;
+    text-shadow: 0 0 12px currentColor;
 }
+
+.team-red  .team-score { color: #e74c3c; }
+.team-blue .team-score { color: #3498db; }
 
 .shots {
     display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
+    gap: 4px;
     font-size: 9px;
-    padding: 0 10px;
-    line-height: 1.1;
-    background: rgba(0, 0, 0, 0.6);
-    height: 100%;
+    color: #888;
+    margin-top: 2px;
 }
 
+/* ── Clock ── */
 .time-container {
     display: flex;
     flex-direction: column;
     align-items: center;
-    justify-content: center;
-    flex-grow: 1;
 }
 
 .clock {
-    font-size: 24px;
+    font-size: 22px;
     font-weight: 700;
-    line-height: 1;
+    color: #fff;
+    letter-spacing: 2px;
 }
 
 .period {
-    font-size: 12px;
-    font-weight: 500;
+    font-size: 9px;
     color: #aaa;
+    letter-spacing: 1px;
 }
 
+/* ── Pause button ── */
 .pause-btn {
-    width: 30px;
-    height: 30px;
-    background: #ccc;
-    border-radius: 4px;
+    position: absolute;
+    right: 10px;
+    top: 50%;
+    transform: translateY(-50%);
     display: flex;
-    align-items: center;
-    justify-content: space-around;
+    gap: 3px;
     padding: 6px;
-    margin-left: 10px;
     cursor: pointer;
-    pointer-events: auto;
 }
 
-.pause-btn .bar {
-    width: 6px;
-    height: 100%;
-    background: #333;
+.bar {
+    width: 4px;
+    height: 16px;
+    background: #fff;
     border-radius: 2px;
+    opacity: 0.7;
 }
 
+/* ── Goal overlay ── */
 #goal-overlay {
     position: absolute;
-    top: 15%;
-    left: 50%;
-    transform: translateX(-50%);
-    background: rgba(0, 0, 0, 0.8);
-    padding: 20px 40px;
-    border-radius: 8px;
-    border: 2px solid #ffd700;
-    box-shadow: 0 10px 25px rgba(0,0,0,0.8);
-    transition: opacity 0.3s ease;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(0,0,0,0.5);
+    pointer-events: none;
+    transition: opacity 0.3s;
 }
 
 #goal-overlay.hidden {
-    opacity: 0;
-    pointer-events: none;
+    display: none;
 }
 
 .goal-text {
-    font-family: 'DotGothic16', sans-serif;
-    font-size: 64px;
-    font-weight: 400;
-    color: #ffc107;
-    letter-spacing: 2px;
-    text-shadow: 0 0 15px rgba(255, 193, 7, 0.6);
+    font-size: 56px;
+    font-weight: 900;
+    color: #fff;
+    text-shadow: 0 0 30px #f39c12, 0 0 60px #f39c12;
+    letter-spacing: 4px;
+    animation: goalPulse 0.6s ease-in-out infinite alternate;
 }
+
+@keyframes goalPulse {
+    from { transform: scale(1);    opacity: 1; }
+    to   { transform: scale(1.08); opacity: 0.85; }
+}
+
+@import url('https://fonts.googleapis.com/css2?family=Oswald:wght@400;700;900&display=swap');
