@@ -132,6 +132,7 @@ export class Player extends Entity {
             ctx.stroke();
 
             // Name plate background
+            const names = ['SMITH', 'JOHNSON', 'WILLIAMS', 'BROWN', 'JONES', 'MILLER', 'DAVIS', 'GARCIA', 'RODRIGUEZ', 'WILSON'];
             const pName = 'J. ' + names[this.id % names.length];
             ctx.font = 'bold 12px Oswald';
             const textWidth = ctx.measureText(pName).width;
