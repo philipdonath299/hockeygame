@@ -37,7 +37,7 @@ export class Player extends Entity {
         super(x, y, 15, 10);
         this.team = team; // 0 for player, 1 for opponent
         this.id = id;
-        this.maxSpeed = 4.5;
+        this.maxSpeed = 8.0; // Increased speed
         this.restitution = 0.2;
         this.hasPuck = false;
         this.stunTimer = 0;
@@ -50,9 +50,9 @@ export class Player extends Entity {
     update(dt) {
         if (this.stunTimer > 0) {
             this.stunTimer -= dt;
-            this.maxSpeed = 2; // Slowed down while recovering
+            this.maxSpeed = 3.5; // Slowed down while recovering
         } else {
-            this.maxSpeed = 4.5;
+            this.maxSpeed = 8.0;
         }
         super.update(dt);
     }
@@ -101,7 +101,7 @@ export class Player extends Entity {
         const dmag = Vector.mag(desired);
         if (dmag === 0) return { x: 0, y: 0 };
         const normDesired = Vector.mult(Vector.normalize(desired), this.maxSpeed);
-        return Vector.limit(Vector.sub(normDesired, this.vel), 0.2); // max force
+        return Vector.limit(Vector.sub(normDesired, this.vel), 0.6); // max force
     }
 
     arrive(target, slowdownRadius) {
@@ -115,7 +115,7 @@ export class Player extends Entity {
         }
         
         const normDesired = Vector.mult(Vector.normalize(desired), speed);
-        return Vector.limit(Vector.sub(normDesired, this.vel), 0.2);
+        return Vector.limit(Vector.sub(normDesired, this.vel), 0.6);
     }
 }
 

@@ -13,8 +13,9 @@ class Game {
         this.engine = new GameEngine((dt) => this.update(dt), (alpha) => this.render(alpha));
 
         this.gameState = 'PLAYING'; // PLAYING, GOAL, FACEOFF
-        this.rink = new Rink(this.width, this.height);
-        this.puck = new Puck(this.width / 2, this.height / 2);
+        this.rink = new Rink(800, 1400); // Fixed size, larger than screen
+        this.camera = { x: 0, y: 0 };
+        this.puck = new Puck(400, 700);
         
         this.players = [];
         this.controlledPlayerIndex = -1; // Index in players array
@@ -34,16 +35,12 @@ class Game {
         this.height = window.innerHeight;
         this.canvas.width = this.width;
         this.canvas.height = this.height;
-        if (this.rink) {
-            this.rink.width = this.width;
-            this.rink.height = this.height;
-        }
     }
 
     setupMatch(teamSize) {
         this.players = [];
-        const cx = this.width / 2;
-        const cy = this.height / 2;
+        const cx = 400; // this.rink.width / 2
+        const cy = 700; // this.rink.height / 2
         
         // Team 0 (Player) - Attacks UP
         this.players.push(new Player(cx, cy + 50, 0, 99)); // Center
@@ -60,8 +57,8 @@ class Game {
     }
 
     resetPositions() {
-        const cx = this.width / 2;
-        const cy = this.height / 2;
+        const cx = 400;
+        const cy = 700;
         this.puck.pos = { x: cx, y: cy };
         this.puck.vel = { x: 0, y: 0 };
         this.puck.carrier = null;
@@ -82,6 +79,9 @@ class Game {
 
     bindInput() {
         this.input.onTap = (x, y) => {
+            const worldX = x + this.camera.x;
+            const worldY = y + this.camera.y;
+            
             if (this.puck.carrier && this.puck.carrier.team === 0) {
                 // Find nearest friendly to pass to
                 let bestTarget = null;
@@ -89,7 +89,7 @@ class Game {
                 
                 this.players.forEach(p => {
                     if (p.team === 0 && p !== this.puck.carrier) {
-                        const distSq = Math.pow(p.pos.x - x, 2) + Math.pow(p.pos.y - y, 2);
+                        const distSq = Math.pow(p.pos.x - worldX, 2) + Math.pow(p.pos.y - worldY, 2);
                         if (distSq < minSqDist) {
                             minSqDist = distSq;
                             bestTarget = p;
@@ -168,7 +168,7 @@ class Game {
         const controlledPlayer = this.players[this.controlledPlayerIndex];
         if (controlledPlayer) {
             if (this.input.joystick.active) {
-                const forceMag = this.input.joystick.magnitude * 0.5; // Max acceleration force
+                const forceMag = this.input.joystick.magnitude * 2.0; // Increased acceleration force
                 const force = Vector.mult(this.input.joystick.vector, forceMag);
                 controlledPlayer.applyForce(force);
             }
@@ -199,8 +199,8 @@ class Game {
     updateAI() {
         const team0HasPuck = this.players.some(p => p.team === 0 && p.hasPuck);
         const team1HasPuck = this.players.some(p => p.team === 1 && p.hasPuck);
-        const topGoalPos = { x: this.width / 2, y: 0 };
-        const bottomGoalPos = { x: this.width / 2, y: this.height };
+        const topGoalPos = { x: 400, y: 0 };
+        const bottomGoalPos = { x: 400, y: 1400 };
 
         this.players.forEach((p, i) => {
             if (i === this.controlledPlayerIndex) return; // Skip human controlled
@@ -213,7 +213,7 @@ class Game {
                     p.applyForce(force);
                     
                     // Simple shoot logic
-                    if (p.pos.y > this.height / 2 && Math.random() < 0.01) {
+                    if (p.pos.y > 700 && Math.random() < 0.01) {
                          // Shoot
                          this.shots[1]++;
                          document.getElementById('shots-away').innerText = this.shots[1];
@@ -236,7 +236,7 @@ class Game {
                         p.applyForce(force);
                     } else {
                         // Collapse
-                        const force = p.arrive({ x: this.width / 2, y: 100 }, 50);
+                        const force = p.arrive({ x: 400, y: 100 }, 50);
                         p.applyForce(force);
                     }
                 }
@@ -343,11 +343,20 @@ class Game {
     render(alpha) {
         this.ctx.clearRect(0, 0, this.width, this.height);
         
-        // Camera translation (optional: center on puck)
+        // Update Camera
+        let targetCamX = this.puck.pos.x - this.width / 2;
+        let targetCamY = this.puck.pos.y - this.height / 2;
+        
+        // Clamp camera to rink bounds
+        targetCamX = Math.max(0, Math.min(targetCamX, this.rink.width - this.width));
+        targetCamY = Math.max(0, Math.min(targetCamY, this.rink.height - this.height));
+        
+        // Smooth camera follow
+        this.camera.x += (targetCamX - this.camera.x) * 0.1;
+        this.camera.y += (targetCamY - this.camera.y) * 0.1;
+        
         this.ctx.save();
-        // Simple follow cam slightly offsetting based on puck
-        // const camY = this.height / 2 - this.puck.pos.y;
-        // this.ctx.translate(0, camY * 0.1); 
+        this.ctx.translate(-this.camera.x, -this.camera.y);
         
         this.rink.render(this.ctx);
         
