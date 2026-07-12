@@ -31,10 +31,11 @@ class Game {
     }
 
     resize() {
-        // Fix internal width to 800 so the whole rink is visible horizontally
-        this.width = 800;
+        // Fix internal viewport width to 360 to match standard mobile zoom
+        // This ensures the camera pans horizontally across the 800-width rink
+        this.width = 360;
         // Scale height proportionally to screen aspect ratio
-        this.height = Math.floor(800 * (window.innerHeight / window.innerWidth));
+        this.height = Math.floor(this.width * (window.innerHeight / window.innerWidth));
         this.canvas.width = this.width;
         this.canvas.height = this.height;
     }
@@ -46,14 +47,14 @@ class Game {
         
         // Team 0 (Player) - Attacks UP (Defends BOTTOM goal)
         this.players.push(new Player(cx, cy + 50, 0, 99)); // Center
-        this.players.push(new Player(cx - 60, cy + 100, 0, 8));  // LW
-        this.players.push(new Player(cx + 60, cy + 100, 0, 19)); // RW
+        this.players.push(new Player(cx - 100, cy + 120, 0, 8));  // LW
+        this.players.push(new Player(cx + 100, cy + 120, 0, 19)); // RW
         this.players.push(new Player(cx, 1700, 0, 31, true)); // Goalie
         
         // Team 1 (AI) - Attacks DOWN (Defends TOP goal)
         this.players.push(new Player(cx, cy - 50, 1, 87)); // Center
-        this.players.push(new Player(cx - 60, cy - 100, 1, 71)); // RW
-        this.players.push(new Player(cx + 60, cy - 100, 1, 58)); // LW
+        this.players.push(new Player(cx - 100, cy - 120, 1, 71)); // RW
+        this.players.push(new Player(cx + 100, cy - 120, 1, 58)); // LW
         this.players.push(new Player(cx, 100, 1, 30, true)); // Goalie
         
         this.resetPositions();
@@ -68,8 +69,8 @@ class Game {
         this.puck.carrier = null;
         
         const positions = [
-            {x: cx, y: cy + 50}, {x: cx - 60, y: cy + 100}, {x: cx + 60, y: cy + 100}, {x: cx, y: 1700},
-            {x: cx, y: cy - 50}, {x: cx - 60, y: cy - 100}, {x: cx + 60, y: cy - 100}, {x: cx, y: 100}
+            {x: cx, y: cy + 50}, {x: cx - 100, y: cy + 120}, {x: cx + 100, y: cy + 120}, {x: cx, y: 1700},
+            {x: cx, y: cy - 50}, {x: cx - 100, y: cy - 120}, {x: cx + 100, y: cy - 120}, {x: cx, y: 100}
         ];
         
         this.players.forEach((p, i) => {
