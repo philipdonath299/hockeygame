@@ -1,0 +1,162 @@
+@import url('https://fonts.googleapis.com/css2?family=Oswald:wght@500;700&display=swap');
+
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+    -webkit-touch-callout: none;
+    -webkit-user-select: none;
+    user-select: none;
+}
+
+body, html {
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    background-color: #111;
+    font-family: 'Oswald', sans-serif;
+    touch-action: none; /* Prevent all browser default touch actions */
+}
+
+#game-canvas {
+    display: block;
+    width: 100%;
+    height: 100%;
+    touch-action: none;
+}
+
+#ui-layer {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none; /* Let touches pass through to canvas */
+    display: flex;
+    flex-direction: column;
+}
+
+#scoreboard {
+    width: 100%;
+    background: linear-gradient(to bottom, #222, #111);
+    color: white;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: env(safe-area-inset-top, 10px) 10px 5px 10px; /* Safe area for iOS notch */
+    border-bottom: 2px solid #000;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.5);
+    pointer-events: auto;
+}
+
+.team-container {
+    display: flex;
+    align-items: center;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 4px;
+    height: 40px;
+}
+
+.team-red {
+    background-color: #8b1c1c; /* Deep red */
+}
+
+.team-blue {
+    background-color: #1c268b; /* Deep blue */
+}
+
+.team-name {
+    font-size: 14px;
+    font-weight: 700;
+    padding: 0 8px;
+    text-transform: uppercase;
+}
+
+.team-score {
+    font-size: 28px;
+    font-weight: 700;
+    padding: 0 10px;
+    background: rgba(0, 0, 0, 0.3);
+    height: 100%;
+    display: flex;
+    align-items: center;
+}
+
+.shots {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    font-size: 10px;
+    padding: 0 8px;
+    line-height: 1.1;
+    background: rgba(0, 0, 0, 0.2);
+    height: 100%;
+}
+
+.time-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    flex-grow: 1;
+}
+
+.clock {
+    font-size: 24px;
+    font-weight: 700;
+    line-height: 1;
+}
+
+.period {
+    font-size: 12px;
+    font-weight: 500;
+    color: #aaa;
+}
+
+.pause-btn {
+    width: 30px;
+    height: 30px;
+    background: #ccc;
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: space-around;
+    padding: 6px;
+    margin-left: 10px;
+    cursor: pointer;
+    pointer-events: auto;
+}
+
+.pause-btn .bar {
+    width: 6px;
+    height: 100%;
+    background: #333;
+    border-radius: 2px;
+}
+
+#goal-overlay {
+    position: absolute;
+    top: 15%;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(0, 0, 0, 0.8);
+    padding: 20px 40px;
+    border-radius: 8px;
+    border: 2px solid #ffd700;
+    box-shadow: 0 10px 25px rgba(0,0,0,0.8);
+    transition: opacity 0.3s ease;
+}
+
+#goal-overlay.hidden {
+    opacity: 0;
+    pointer-events: none;
+}
+
+.goal-text {
+    font-size: 48px;
+    font-weight: 700;
+    color: #ffd700;
+    letter-spacing: 4px;
+    text-shadow: 0 0 10px rgba(255, 215, 0, 0.5);
+}

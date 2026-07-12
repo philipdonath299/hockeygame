@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <title>Arcade Hockey</title>
+    <link rel="manifest" href="manifest.json">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div id="ui-layer">
+        <div id="scoreboard">
+            <div class="team-container team-red">
+                <span class="team-name">YOU</span>
+                <span class="team-score" id="score-home">0</span>
+                <div class="shots">
+                    <span>SHOTS</span>
+                    <span id="shots-home">0</span>
+                </div>
+            </div>
+            
+            <div class="time-container">
+                <span class="clock" id="clock">5:00</span>
+                <span class="period" id="period">1ST</span>
+            </div>
+            
+            <div class="team-container team-blue">
+                <div class="shots">
+                    <span>SHOTS</span>
+                    <span id="shots-away">0</span>
+                </div>
+                <span class="team-score" id="score-away">0</span>
+                <span class="team-name">OPP</span>
+            </div>
+            
+            <div class="pause-btn" id="pause-btn">
+                <div class="bar"></div>
+                <div class="bar"></div>
+            </div>
+        </div>
+        
+        <div id="goal-overlay" class="hidden">
+            <div class="goal-text">GOAL!</div>
+        </div>
+    </div>
+
+    <canvas id="game-canvas"></canvas>
+
+    <script type="module" src="main.js"></script>
+    <script type="module">
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('/sw.js').then(registration => {
+                    console.log('SW registered: ', registration);
+                }).catch(registrationError => {
+                    console.log('SW registration failed: ', registrationError);
+                });
+            });
+        }
+    </script>
+</body>
+</html>
