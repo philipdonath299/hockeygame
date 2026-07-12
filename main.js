@@ -42,15 +42,17 @@ class Game {
         const cx = 400; // this.rink.width / 2
         const cy = 700; // this.rink.height / 2
         
-        // Team 0 (Player) - Attacks UP
+        // Team 0 (Player) - Attacks UP (Defends BOTTOM goal)
         this.players.push(new Player(cx, cy + 50, 0, 99)); // Center
         this.players.push(new Player(cx - 60, cy + 100, 0, 8));  // LW
         this.players.push(new Player(cx + 60, cy + 100, 0, 19)); // RW
+        this.players.push(new Player(cx, 1300, 0, 31, true)); // Goalie
         
-        // Team 1 (AI) - Attacks DOWN
+        // Team 1 (AI) - Attacks DOWN (Defends TOP goal)
         this.players.push(new Player(cx, cy - 50, 1, 87)); // Center
         this.players.push(new Player(cx - 60, cy - 100, 1, 71)); // RW
         this.players.push(new Player(cx + 60, cy - 100, 1, 58)); // LW
+        this.players.push(new Player(cx, 100, 1, 30, true)); // Goalie
         
         this.resetPositions();
         this.gameState = 'PLAYING';
@@ -64,8 +66,8 @@ class Game {
         this.puck.carrier = null;
         
         const positions = [
-            {x: cx, y: cy + 50}, {x: cx - 60, y: cy + 100}, {x: cx + 60, y: cy + 100},
-            {x: cx, y: cy - 50}, {x: cx - 60, y: cy - 100}, {x: cx + 60, y: cy - 100}
+            {x: cx, y: cy + 50}, {x: cx - 60, y: cy + 100}, {x: cx + 60, y: cy + 100}, {x: cx, y: 1300},
+            {x: cx, y: cy - 50}, {x: cx - 60, y: cy - 100}, {x: cx + 60, y: cy - 100}, {x: cx, y: 100}
         ];
         
         this.players.forEach((p, i) => {
@@ -136,7 +138,7 @@ class Game {
         let bestIndex = -1;
         
         this.players.forEach((p, i) => {
-            if (p.team === 0) {
+            if (p.team === 0 && !p.isGoalie) {
                 if (p.hasPuck) {
                     bestIndex = i; // Always control puck carrier on offense
                     bestScore = -1;
@@ -204,6 +206,19 @@ class Game {
 
         this.players.forEach((p, i) => {
             if (i === this.controlledPlayerIndex) return; // Skip human controlled
+            
+            if (p.isGoalie) {
+                // Goalie AI
+                const myGoalY = p.team === 0 ? 1300 : 100;
+                const goalPos = { x: 400, y: myGoalY };
+                const dirToPuck = Vector.normalize(Vector.sub(this.puck.pos, goalPos));
+                // Stay on the angle, slightly out of the net
+                const target = Vector.add(goalPos, Vector.mult(dirToPuck, 30)); 
+                
+                const force = p.arrive(target, 20);
+                p.applyForce(force);
+                return; // done with goalie
+            }
             
             if (p.team === 1) {
                 // Opponent AI

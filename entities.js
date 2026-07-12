@@ -33,11 +33,12 @@ export class Entity {
 }
 
 export class Player extends Entity {
-    constructor(x, y, team, id) {
-        super(x, y, 15, 10);
+    constructor(x, y, team, id, isGoalie = false) {
+        super(x, y, isGoalie ? 18 : 15, 10);
         this.team = team; // 0 for player, 1 for opponent
         this.id = id;
-        this.maxSpeed = 8.0; // Increased speed
+        this.isGoalie = isGoalie;
+        this.maxSpeed = isGoalie ? 4.0 : 8.0; // Increased speed
         this.restitution = 0.2;
         this.hasPuck = false;
         this.stunTimer = 0;
@@ -50,9 +51,9 @@ export class Player extends Entity {
     update(dt) {
         if (this.stunTimer > 0) {
             this.stunTimer -= dt;
-            this.maxSpeed = 3.5; // Slowed down while recovering
+            this.maxSpeed = this.isGoalie ? 2.0 : 3.5; // Slowed down while recovering
         } else {
-            this.maxSpeed = 8.0;
+            this.maxSpeed = this.isGoalie ? 4.0 : 8.0;
         }
         super.update(dt);
     }
@@ -145,49 +146,76 @@ export class Rink {
     constructor(width, height) {
         this.width = width;
         this.height = height;
-        this.boardsRadius = 50;
+        this.boardsRadius = 150;
         this.goalWidth = 80;
         this.goalDepth = 30;
+        this.goalOffset = 100;
     }
 
-    // Handle collision with outer boards
+    // Handle collision with outer boards (including rounded corners)
     collideBoards(entity) {
         let collided = false;
-        
-        // Left & Right bounds
-        if (entity.pos.x < entity.radius) {
-            entity.pos.x = entity.radius;
+        const r = this.boardsRadius;
+        const eR = entity.radius;
+
+        // 1. Basic AABB walls (straight sections)
+        if (entity.pos.x < eR && entity.pos.y >= r && entity.pos.y <= this.height - r) {
+            entity.pos.x = eR;
             entity.vel.x *= -entity.restitution;
             collided = true;
-        } else if (entity.pos.x > this.width - entity.radius) {
-            entity.pos.x = this.width - entity.radius;
+        } else if (entity.pos.x > this.width - eR && entity.pos.y >= r && entity.pos.y <= this.height - r) {
+            entity.pos.x = this.width - eR;
             entity.vel.x *= -entity.restitution;
             collided = true;
         }
 
-        // Top & Bottom bounds (excluding goal areas)
-        const isGoalX = entity.pos.x > (this.width / 2 - this.goalWidth / 2) && 
-                        entity.pos.x < (this.width / 2 + this.goalWidth / 2);
-
-        if (entity.pos.y < entity.radius) {
-            if (!isGoalX) {
-                entity.pos.y = entity.radius;
-                entity.vel.y *= -entity.restitution;
-                collided = true;
-            }
-        } else if (entity.pos.y > this.height - entity.radius) {
-            if (!isGoalX) {
-                entity.pos.y = this.height - entity.radius;
-                entity.vel.y *= -entity.restitution;
-                collided = true;
-            }
+        if (entity.pos.y < eR && entity.pos.x >= r && entity.pos.x <= this.width - r) {
+            entity.pos.y = eR;
+            entity.vel.y *= -entity.restitution;
+            collided = true;
+        } else if (entity.pos.y > this.height - eR && entity.pos.x >= r && entity.pos.x <= this.width - r) {
+            entity.pos.y = this.height - eR;
+            entity.vel.y *= -entity.restitution;
+            collided = true;
         }
+
+        // 2. Rounded Corners
+        const checkCorner = (cx, cy) => {
+            const dx = entity.pos.x - cx;
+            const dy = entity.pos.y - cy;
+            const dist = Math.sqrt(dx * dx + dy * dy);
+            if (dist > r - eR) {
+                const overlap = dist - (r - eR);
+                const nx = dx / dist;
+                const ny = dy / dist;
+                
+                entity.pos.x -= nx * overlap;
+                entity.pos.y -= ny * overlap;
+                
+                const dot = entity.vel.x * nx + entity.vel.y * ny;
+                if (dot > 0) {
+                    entity.vel.x -= (1 + entity.restitution) * dot * nx;
+                    entity.vel.y -= (1 + entity.restitution) * dot * ny;
+                }
+                collided = true;
+            }
+        };
+
+        if (entity.pos.x < r && entity.pos.y < r) checkCorner(r, r); // Top-left
+        if (entity.pos.x > this.width - r && entity.pos.y < r) checkCorner(this.width - r, r); // Top-right
+        if (entity.pos.x < r && entity.pos.y > this.height - r) checkCorner(r, this.height - r); // Bottom-left
+        if (entity.pos.x > this.width - r && entity.pos.y > this.height - r) checkCorner(this.width - r, this.height - r); // Bottom-right
+
         return collided;
     }
 
     checkGoal(puck) {
-        if (puck.pos.y < -this.goalDepth / 2) return 1; // Top goal scored (team 0 scored)
-        if (puck.pos.y > this.height + this.goalDepth / 2) return 0; // Bottom goal scored (team 1 scored)
+        const gw = this.goalWidth / 2;
+        // Top goal (Team 1 defends, Team 0 scores)
+        if (puck.pos.y < this.goalOffset && puck.pos.y > this.goalOffset - this.goalDepth && puck.pos.x > this.width / 2 - gw && puck.pos.x < this.width / 2 + gw) return 0;
+        // Bottom goal
+        if (puck.pos.y > this.height - this.goalOffset && puck.pos.y < this.height - this.goalOffset + this.goalDepth && puck.pos.x > this.width / 2 - gw && puck.pos.x < this.width / 2 + gw) return 1;
+        
         return -1;
     }
 
@@ -195,8 +223,43 @@ export class Rink {
         const cx = this.width / 2;
         const cy = this.height / 2;
 
+        // Dark background outside the rink (stadium seats representation)
+        ctx.fillStyle = '#1a1a24';
+        ctx.fillRect(-2000, -2000, this.width + 4000, this.height + 4000);
+
+        // Draw the rounded rink
+        const r = this.boardsRadius;
+        ctx.beginPath();
+        if (ctx.roundRect) {
+            ctx.roundRect(0, 0, this.width, this.height, r);
+        } else {
+            ctx.moveTo(r, 0);
+            ctx.lineTo(this.width - r, 0);
+            ctx.quadraticCurveTo(this.width, 0, this.width, r);
+            ctx.lineTo(this.width, this.height - r);
+            ctx.quadraticCurveTo(this.width, this.height, this.width - r, this.height);
+            ctx.lineTo(r, this.height);
+            ctx.quadraticCurveTo(0, this.height, 0, this.height - r);
+            ctx.lineTo(0, r);
+            ctx.quadraticCurveTo(0, 0, r, 0);
+        }
+        ctx.closePath();
+
         ctx.fillStyle = '#eaf5fa'; // Ice color
-        ctx.fillRect(0, 0, this.width, this.height);
+        ctx.fill();
+
+        // Thick Boards border
+        ctx.lineWidth = 12;
+        ctx.strokeStyle = '#f0d800'; // Yellow dash/board edge
+        ctx.stroke();
+        
+        ctx.lineWidth = 4;
+        ctx.strokeStyle = '#0055a4'; // Blue trim
+        ctx.stroke();
+
+        // Clip all ice markings to not bleed out of the rounded rink
+        ctx.save();
+        ctx.clip();
 
         ctx.strokeStyle = '#c9302c'; // Red lines
         ctx.lineWidth = 3;
@@ -210,63 +273,77 @@ export class Rink {
         // Blue lines
         ctx.strokeStyle = '#286090';
         ctx.beginPath();
-        ctx.moveTo(0, cy - 150);
-        ctx.lineTo(this.width, cy - 150);
+        ctx.moveTo(0, cy - 250);
+        ctx.lineTo(this.width, cy - 250);
         ctx.stroke();
         ctx.beginPath();
-        ctx.moveTo(0, cy + 150);
-        ctx.lineTo(this.width, cy + 150);
+        ctx.moveTo(0, cy + 250);
+        ctx.lineTo(this.width, cy + 250);
+        ctx.stroke();
+        
+        // Goal lines (Red)
+        ctx.strokeStyle = '#c9302c';
+        ctx.beginPath();
+        ctx.moveTo(0, this.goalOffset);
+        ctx.lineTo(this.width, this.goalOffset);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(0, this.height - this.goalOffset);
+        ctx.lineTo(this.width, this.height - this.goalOffset);
         ctx.stroke();
 
         // Center circle
         ctx.beginPath();
-        ctx.arc(cx, cy, 60, 0, Math.PI * 2);
+        ctx.arc(cx, cy, 80, 0, Math.PI * 2);
         ctx.strokeStyle = '#286090';
+        ctx.lineWidth = 3;
         ctx.stroke();
 
         // Faceoff dots
         ctx.fillStyle = '#c9302c';
         const dots = [
             { x: cx, y: cy },
-            { x: cx - 60, y: cy - 200 }, { x: cx + 60, y: cy - 200 },
-            { x: cx - 60, y: cy + 200 }, { x: cx + 60, y: cy + 200 }
+            { x: cx - 150, y: cy - 350 }, { x: cx + 150, y: cy - 350 },
+            { x: cx - 150, y: cy + 350 }, { x: cx + 150, y: cy + 350 }
         ];
         dots.forEach(d => {
             ctx.beginPath();
-            ctx.arc(d.x, d.y, 4, 0, Math.PI * 2);
+            ctx.arc(d.x, d.y, 6, 0, Math.PI * 2);
             ctx.fill();
         });
 
-        // Crease
+        // Creases
         ctx.fillStyle = 'rgba(40, 96, 144, 0.3)';
         ctx.beginPath();
-        ctx.arc(cx, 0, 40, 0, Math.PI);
+        ctx.arc(cx, this.goalOffset, 50, 0, Math.PI);
         ctx.fill();
         ctx.stroke();
 
         ctx.beginPath();
-        ctx.arc(cx, this.height, 40, Math.PI, Math.PI * 2);
+        ctx.arc(cx, this.height - this.goalOffset, 50, Math.PI, Math.PI * 2);
         ctx.fill();
         ctx.stroke();
         
-        // Goals rendering
+        ctx.restore(); // remove clip
+
+        // Goals rendering (Draw them after clipping so they can sit on the line properly without being cut)
         ctx.strokeStyle = '#d9534f'; // Red goal posts
         ctx.lineWidth = 4;
         
         // Top goal
         ctx.beginPath();
-        ctx.moveTo(cx - this.goalWidth/2, 0);
-        ctx.lineTo(cx - this.goalWidth/2, -this.goalDepth);
-        ctx.lineTo(cx + this.goalWidth/2, -this.goalDepth);
-        ctx.lineTo(cx + this.goalWidth/2, 0);
+        ctx.moveTo(cx - this.goalWidth/2, this.goalOffset);
+        ctx.lineTo(cx - this.goalWidth/2, this.goalOffset - this.goalDepth);
+        ctx.lineTo(cx + this.goalWidth/2, this.goalOffset - this.goalDepth);
+        ctx.lineTo(cx + this.goalWidth/2, this.goalOffset);
         ctx.stroke();
 
         // Bottom goal
         ctx.beginPath();
-        ctx.moveTo(cx - this.goalWidth/2, this.height);
-        ctx.lineTo(cx - this.goalWidth/2, this.height + this.goalDepth);
-        ctx.lineTo(cx + this.goalWidth/2, this.height + this.goalDepth);
-        ctx.lineTo(cx + this.goalWidth/2, this.height);
+        ctx.moveTo(cx - this.goalWidth/2, this.height - this.goalOffset);
+        ctx.lineTo(cx - this.goalWidth/2, this.height - this.goalOffset + this.goalDepth);
+        ctx.lineTo(cx + this.goalWidth/2, this.height - this.goalOffset + this.goalDepth);
+        ctx.lineTo(cx + this.goalWidth/2, this.height - this.goalOffset);
         ctx.stroke();
     }
 }
