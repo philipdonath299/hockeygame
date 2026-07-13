@@ -120,8 +120,8 @@ export class Player {
         this.isGoalie = isGoalie;
         this.hasPuck  = false;
         this.stunTimer = 0;
-        this.maxSpeed = isGoalie ? 4.8 : 7.5;
-        this.friction = 0.83;
+        this.maxSpeed = isGoalie ? 4.8 : 8.0;
+        this.friction = 0.77;
         this.angle    = team === 0 ? -Math.PI / 2 : Math.PI / 2;
         this.tackleFrames = 0;
 

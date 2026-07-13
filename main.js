@@ -118,9 +118,9 @@ const SWITCH_INTERVAL = 0.25;
 const WRIST_POWER     = 12;
 const SLAP_POWER      = 20;
 const PASS_POWER      = 13;
-const PICKUP_BONUS    = 6;
+const PICKUP_BONUS    = 12;
 const TACKLE_SPEED    = 22;
-const TACKLE_COOLDOWN = 1.2;
+const TACKLE_COOLDOWN = 1.0;
 const CHECK_THRESHOLD = 4.5;
 
 // Team config
@@ -565,7 +565,7 @@ class Game {
                     }
 
                     // Pass target preview
-                    let bestMate = null, bestDot = 0.75;
+                    let bestMate = null, bestDot = 0.4;
                     this.players.forEach(q => {
                         if (q.team !== 0 || q === cp || q.isGoalie) return;
                         const mx = q.pos.x - cp.pos.x, my = q.pos.y - cp.pos.y;
@@ -618,9 +618,11 @@ class Game {
         const attackY0 = this.rink.goalLineY0;
         const attackY1 = this.rink.goalLineY1;
 
-        // Track AI shoot cooldowns
+        // Track AI shoot and tackle cooldowns
         if (!this._aiShootCooldowns) this._aiShootCooldowns = [0,0,0,0,0,0,0,0];
+        if (!this._aiTackleCooldowns) this._aiTackleCooldowns = [0,0,0,0,0,0,0,0];
         this._aiShootCooldowns = this._aiShootCooldowns.map(c => Math.max(0, c - dt));
+        this._aiTackleCooldowns = this._aiTackleCooldowns.map(c => Math.max(0, c - dt));
 
         this.players.forEach((p, i) => {
             if (i === this.controlledIdx) return;
@@ -733,9 +735,17 @@ class Game {
                     const bChecking = b.tackleFrames > 0;
 
                     if (b.hasPuck && (aChecking || spdA > CHECK_THRESHOLD)) {
-                        this._dislodge(b, a);
+                        const canTackle = a.team === 0 || this._aiTackleCooldowns[this.players.indexOf(a)] === 0;
+                        if (canTackle) {
+                            this._dislodge(b, a);
+                            if (a.team === 1) this._aiTackleCooldowns[this.players.indexOf(a)] = 2.0; // AI cooldown
+                        }
                     } else if (a.hasPuck && (bChecking || spdB > CHECK_THRESHOLD)) {
-                        this._dislodge(a, b);
+                        const canTackle = b.team === 0 || this._aiTackleCooldowns[this.players.indexOf(b)] === 0;
+                        if (canTackle) {
+                            this._dislodge(a, b);
+                            if (b.team === 1) this._aiTackleCooldowns[this.players.indexOf(b)] = 2.0; // AI cooldown
+                        }
                     } else if (hit) {
                         const mx = (a.pos.x+b.pos.x)/2, my = (a.pos.y+b.pos.y)/2;
                         this.particles.emit(mx, my, 4, {
@@ -754,7 +764,7 @@ class Game {
 
     _dislodge(carrier, hitter) {
         carrier.hasPuck   = false;
-        carrier.stunTimer = 0.9;
+        carrier.stunTimer = 0.5;
         carrier.hitFlash  = 0.5;
         hitter.hitFlash   = 0.2;
         this.puck.carrier = null;

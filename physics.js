@@ -48,7 +48,7 @@ export function resolveCircleCollision(a, b) {
     // Already separating
     if (vn > 0) return true;
 
-    const e = 0.4; // restitution
+    const e = 0.15; // restitution
     const totalMass = a.mass + b.mass;
     const impulse = -(1 + e) * vn / totalMass;
 
