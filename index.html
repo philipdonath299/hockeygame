@@ -16,7 +16,25 @@
 
 <canvas id="game-canvas"></canvas>
 
-<div id="ui-layer">
+    <!-- Start Menu Overlay -->
+    <div id="start-menu">
+        <div class="menu-content">
+            <h1 class="game-title">SUPERSTAR<br>HOCKEY</h1>
+            <button id="btn-play" class="menu-btn primary">PLAY MATCH</button>
+            <button id="btn-settings" class="menu-btn secondary">SETTINGS</button>
+        </div>
+    </div>
+
+    <!-- Team Selection Overlay -->
+    <div id="team-selection" class="hidden">
+        <h2>SELECT YOUR TEAM</h2>
+        <div class="team-cards" id="team-cards">
+            <!-- Rendered by JS -->
+        </div>
+        <button id="btn-start-match" class="menu-btn primary disabled">START</button>
+    </div>
+
+<div id="ui-layer" class="hidden">
     <!-- Scoreboard -->
     <div id="scoreboard">
         <!-- Home team -->

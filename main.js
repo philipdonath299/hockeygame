@@ -5,6 +5,7 @@ import { resolveCircleCollision }   from './physics.js';
 import { SFX } from './audio.js';
 import { ParticleSystem } from './particles.js';
 import { GameAI } from './ai.js';
+import { StorageManager } from './storage.js';
 
 // ─── CONSTANTS ─────────────────────────────────────────────────────────────────
 const PERIOD_DURATION = 180; // 3 minutes per period
@@ -61,6 +62,7 @@ class Game {
         this.sfx       = new SFX();
         this.particles = new ParticleSystem();
         this.ai        = new GameAI(this);
+        this.storage   = new StorageManager();
 
         // Last scorer name for goal overlay
         this.lastScorerName = '';
@@ -86,9 +88,10 @@ class Game {
 
         this.canvas.addEventListener('pointerdown', () => {
             this.sfx.resume();
-            if (this.gameState === 'MENU') this._startGame();
-            else if (this.gameState === 'GAMEOVER') this._newGame();
+            if (this.gameState === 'GAMEOVER') this._newGame();
         });
+
+        this._initMenuUI();
 
         // Action buttons
         this._setupActionButtons();
@@ -99,6 +102,45 @@ class Game {
         this.engine.start();
     }
 
+    _initMenuUI() {
+        document.getElementById('btn-play').addEventListener('click', () => {
+            this.sfx.resume();
+            this.sfx.buttonPress();
+            document.getElementById('start-menu').classList.add('hidden');
+            this._showTeamSelection();
+        });
+
+        document.getElementById('btn-start-match').addEventListener('click', (e) => {
+            if (e.target.classList.contains('disabled')) return;
+            this.sfx.buttonPress();
+            document.getElementById('team-selection').classList.add('hidden');
+            document.getElementById('ui-layer').classList.remove('hidden');
+            this._startGame();
+        });
+    }
+
+    _showTeamSelection() {
+        const container = document.getElementById('team-cards');
+        container.innerHTML = '';
+        
+        TEAMS.forEach((team, idx) => {
+            const card = document.createElement('div');
+            card.className = `team-card ${idx === this.storage.data.lastTeamIndex ? 'selected' : ''}`;
+            card.innerHTML = `<div class="emoji">${team.emoji}</div><div class="name">${team.name}</div>`;
+            card.onclick = () => {
+                document.querySelectorAll('.team-card').forEach(c => c.classList.remove('selected'));
+                card.classList.add('selected');
+                this.storage.data.lastTeamIndex = idx;
+                this.storage.save();
+                this.sfx.buttonPress();
+                this._setupMatch(); // Refresh the teams
+            };
+            container.appendChild(card);
+        });
+
+        document.getElementById('btn-start-match').classList.remove('disabled');
+        document.getElementById('team-selection').classList.remove('hidden');
+    }
     _setupActionButtons() {
         const btnShoot = document.getElementById('btn-shoot');
         const btnPass  = document.getElementById('btn-pass');
@@ -174,17 +216,24 @@ class Game {
         this.players = [];
         const cx = this.rink.w / 2, cy = this.rink.h / 2;
 
-        // Team 0 (red, human) — attacks top goal (goalLineY0)
-        this.players.push(new Player(cx,       cy + 55,  0, 99, false, TEAMS[0], 'CENTER')); // center  → i=0
-        this.players.push(new Player(cx - 110, cy + 130, 0, 8,  false, TEAMS[0], 'LW'));     // LW      → i=1
-        this.players.push(new Player(cx + 110, cy + 130, 0, 19, false, TEAMS[0], 'RW'));     // RW      → i=2
-        this.players.push(new Player(cx, this.rink.goalLineY1 - 45, 0, 31, true, TEAMS[0])); // GK → i=3
+        const myTeamIdx = this.storage ? this.storage.data.lastTeamIndex : 0;
+        let aiTeamIdx = Math.floor(Math.random() * TEAMS.length);
+        if (aiTeamIdx === myTeamIdx) aiTeamIdx = (aiTeamIdx + 1) % TEAMS.length;
 
-        // Team 1 (blue, AI) — attacks bottom goal (goalLineY1)
-        this.players.push(new Player(cx,       cy - 55,  1, 87, false, TEAMS[1], 'CENTER')); // center  → i=4
-        this.players.push(new Player(cx - 110, cy - 130, 1, 71, false, TEAMS[1], 'LW'));     // LW      → i=5
-        this.players.push(new Player(cx + 110, cy - 130, 1, 58, false, TEAMS[1], 'RW'));     // RW      → i=6
-        this.players.push(new Player(cx, this.rink.goalLineY0 + 45, 1, 30, true, TEAMS[1])); // GK → i=7
+        const myTeam = TEAMS[myTeamIdx];
+        const aiTeam = TEAMS[aiTeamIdx];
+
+        // Team 0 (human) — attacks top goal (goalLineY0)
+        this.players.push(new Player(cx,       cy + 55,  0, 99, false, myTeam, 'CENTER'));
+        this.players.push(new Player(cx - 110, cy + 130, 0, 8,  false, myTeam, 'LW'));
+        this.players.push(new Player(cx + 110, cy + 130, 0, 19, false, myTeam, 'RW'));
+        this.players.push(new Player(cx, this.rink.goalLineY1 - 45, 0, 31, true, myTeam));
+
+        // Team 1 (AI) — attacks bottom goal (goalLineY1)
+        this.players.push(new Player(cx,       cy - 55,  1, 87, false, aiTeam, 'CENTER'));
+        this.players.push(new Player(cx - 110, cy - 130, 1, 71, false, aiTeam, 'LW'));
+        this.players.push(new Player(cx + 110, cy - 130, 1, 58, false, aiTeam, 'RW'));
+        this.players.push(new Player(cx, this.rink.goalLineY0 + 45, 1, 30, true, aiTeam));
 
         this._resetPositions();
     }
@@ -865,131 +914,14 @@ class Game {
     }
 
     _renderMenu(ctx, vw, vh) {
-        // Background: dark gradient
-        const bg = ctx.createLinearGradient(0, 0, 0, vh);
-        bg.addColorStop(0, '#040a14');
-        bg.addColorStop(1, '#071525');
-        ctx.fillStyle = bg;
-        ctx.fillRect(0, 0, vw, vh);
+        // Slowly pan camera over the rink for a cinematic menu background
+        this.cam.x = (this.rink.w / 2) + Math.sin(Date.now() * 0.0002) * 200 - vw / 2;
+        this.cam.y = (this.rink.h / 2) + Math.cos(Date.now() * 0.00015) * 300 - vh / 2;
 
-        // Rink preview, blurred/dimmed
+        ctx.clearRect(0, 0, vw, vh);
         ctx.save();
-        const sc = vw / this.rink.w * 0.78;
-        ctx.translate(vw/2, vh * 0.36);
-        ctx.scale(sc, sc);
-        ctx.translate(-this.rink.w/2, -this.rink.h/2);
-        ctx.globalAlpha = 0.55;
+        ctx.translate(-Math.round(this.cam.x), -Math.round(this.cam.y));
         this.rink.render(ctx);
-        ctx.restore();
-
-        // Dark vignette over the rink
-        ctx.fillStyle = 'rgba(4,10,20,0.6)';
-        ctx.fillRect(0, 0, vw, vh);
-
-        // Animated light beam
-        const beamAlpha = 0.04 + 0.03 * Math.sin(Date.now() * 0.002);
-        const beamGrad = ctx.createLinearGradient(vw*0.2, 0, vw*0.8, vh*0.5);
-        beamGrad.addColorStop(0, `rgba(52,152,219,${beamAlpha})`);
-        beamGrad.addColorStop(1, 'transparent');
-        ctx.fillStyle = beamGrad;
-        ctx.fillRect(0, 0, vw, vh);
-
-        ctx.save();
-        ctx.textAlign = 'center';
-
-        // ── Logo ──────────────────────────────────────────────────────────────
-        const logoY = vh * 0.18;
-
-        // Glow behind title
-        ctx.shadowBlur = 50;
-        ctx.shadowColor = '#3498db';
-        ctx.fillStyle = 'transparent';
-        ctx.fillRect(0, logoY - 30, vw, 120);
-        ctx.shadowBlur = 0;
-
-        // "SUPERSTAR" label
-        ctx.fillStyle = 'rgba(255,255,255,0.85)';
-        ctx.font = 'bold 28px Oswald';
-        ctx.fillText('SUPERSTAR', vw/2, logoY);
-
-        // "HOCKEY" main title
-        ctx.shadowBlur = 35;
-        ctx.shadowColor = '#e74c3c';
-        const hGrad = ctx.createLinearGradient(0, logoY+10, 0, logoY+70);
-        hGrad.addColorStop(0, '#ff6b6b');
-        hGrad.addColorStop(1, '#c0392b');
-        ctx.fillStyle = hGrad;
-        ctx.font = 'bold 72px Oswald';
-        ctx.fillText('HOCKEY', vw/2, logoY + 64);
-        ctx.shadowBlur = 0;
-
-        // Divider line
-        ctx.strokeStyle = 'rgba(255,255,255,0.15)';
-        ctx.lineWidth = 1;
-        ctx.beginPath();
-        ctx.moveTo(vw/2 - 80, logoY + 82);
-        ctx.lineTo(vw/2 + 80, logoY + 82);
-        ctx.stroke();
-
-        // Team vs display
-        const vsY = vh * 0.52;
-        // Team 0 badge
-        ctx.save();
-        ctx.translate(vw * 0.28, vsY);
-        this._drawMenuBadge(ctx, TEAMS[0], 44);
-        ctx.fillStyle = '#fff';
-        ctx.font = 'bold 13px Oswald';
-        ctx.fillText(TEAMS[0].abbr, 0, 60);
-        ctx.restore();
-
-        // VS text
-        ctx.fillStyle = 'rgba(255,255,255,0.4)';
-        ctx.font = 'bold 20px Oswald';
-        ctx.fillText('VS', vw/2, vsY + 14);
-
-        // Team 1 badge
-        ctx.save();
-        ctx.translate(vw * 0.72, vsY);
-        this._drawMenuBadge(ctx, TEAMS[1], 44);
-        ctx.fillStyle = '#fff';
-        ctx.font = 'bold 13px Oswald';
-        ctx.fillText(TEAMS[1].abbr, 0, 60);
-        ctx.restore();
-
-        // "Period" info
-        ctx.fillStyle = 'rgba(255,255,255,0.3)';
-        ctx.font = '11px Oswald';
-        ctx.fillText(`${NUM_PERIODS} PERIODS  •  3 MIN EACH`, vw/2, vsY + 88);
-
-        // Tap to play button
-        const pulse = 0.8 + 0.2 * Math.sin(Date.now() * 0.005);
-        const bw = 230, bh = 54, bx = vw/2 - bw/2, by = vh * 0.76;
-
-        // Button glow
-        ctx.shadowBlur = 20 * pulse;
-        ctx.shadowColor = '#e74c3c';
-
-        const btnGrad = ctx.createLinearGradient(bx, by, bx+bw, by+bh);
-        btnGrad.addColorStop(0, '#e74c3c');
-        btnGrad.addColorStop(1, '#c0392b');
-
-        ctx.globalAlpha = 0.9 + 0.1 * pulse;
-        this._rrect(ctx, bx, by, bw, bh, 28);
-        ctx.fillStyle = btnGrad;
-        ctx.fill();
-        ctx.globalAlpha = 1;
-        ctx.shadowBlur = 0;
-
-        ctx.fillStyle = '#fff';
-        ctx.font = 'bold 22px Oswald';
-        ctx.textBaseline = 'middle';
-        ctx.fillText('🏒  PLAY NOW', vw/2, by + bh/2);
-
-        // Controls hint
-        ctx.font = '10px Oswald';
-        ctx.fillStyle = 'rgba(255,255,255,0.3)';
-        ctx.textBaseline = 'alphabetic';
-        ctx.fillText('Swipe left side to skate  •  Release to shoot/pass  •  Swipe to check', vw/2, vh * 0.93);
         ctx.restore();
     }
 
