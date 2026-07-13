@@ -61,13 +61,20 @@ export class Puck {
             }
         }
 
+        // Calculate simulated height (z) based on speed for 3D effect
+        const z = Math.min(Math.max(spd - 12, 0) * 2.5, 12); 
+
         // Shadow
         ctx.save();
         ctx.beginPath();
-        ctx.ellipse(this.pos.x + 2, this.pos.y + 5, this.radius + 3, this.radius * 0.5, 0, 0, Math.PI * 2);
-        ctx.fillStyle = 'rgba(0,0,0,0.35)';
+        ctx.ellipse(this.pos.x + 2 + z*0.5, this.pos.y + 5 + z, this.radius + 3 + z*0.2, (this.radius * 0.5) + z*0.1, 0, 0, Math.PI * 2);
+        ctx.fillStyle = `rgba(0,0,0,${0.35 - (z/12)*0.25})`;
         ctx.fill();
         ctx.restore();
+
+        // Apply elevation to puck body
+        ctx.save();
+        ctx.translate(0, -z);
 
         // Speed glow
         if (spd > 6) {
@@ -99,6 +106,9 @@ export class Puck {
         ctx.fillStyle = 'rgba(255,255,255,0.12)';
         ctx.fill();
         ctx.restore();
+        
+        ctx.restore(); // restore elevation
+        ctx.restore();
     }
 }
 
@@ -128,6 +138,8 @@ export class Player {
         this.skatePhase  = Math.random() * Math.PI * 2;
         this.hitFlash    = 0;
         this.puckGlow    = 0; // glow when picking up puck
+        this.stamina     = 1.0;
+        this.isSprinting = false;
 
         // Team palette from config or fallback
         if (teamConfig) {
@@ -175,13 +187,22 @@ export class Player {
             this.vel.y -= sideY * latV * 0.20;
         }
 
+        if (this.isSprinting && this.stamina > 0) {
+            this.stamina -= dt * 0.35; // Drain stamina
+            if (this.stamina < 0) this.stamina = 0;
+        } else {
+            this.stamina += dt * 0.15; // Recover stamina
+            if (this.stamina > 1) this.stamina = 1.0;
+        }
+
         this.vel.x *= this.friction;
         this.vel.y *= this.friction;
 
+        const currentMax = (this.isSprinting && this.stamina > 0 && !this.isGoalie) ? this.maxSpeed * 1.35 : this.maxSpeed;
         const spd2 = Math.sqrt(this.vel.x**2 + this.vel.y**2);
-        if (spd2 > this.maxSpeed) {
-            this.vel.x = (this.vel.x / spd2) * this.maxSpeed;
-            this.vel.y = (this.vel.y / spd2) * this.maxSpeed;
+        if (spd2 > currentMax) {
+            this.vel.x = (this.vel.x / spd2) * currentMax;
+            this.vel.y = (this.vel.y / spd2) * currentMax;
         }
 
         this.pos.x += this.vel.x;
@@ -396,6 +417,24 @@ export class Player {
             ctx.textBaseline = 'middle';
             ctx.fillText(name, this.pos.x, ty + 7);
             ctx.restore();
+
+            // Stamina ring
+            if (this.stamina < 1.0 || this.isSprinting) {
+                ctx.save();
+                ctx.beginPath();
+                ctx.arc(this.pos.x, this.pos.y, this.radius + 15, -Math.PI / 2, -Math.PI / 2 + this.stamina * Math.PI * 2);
+                ctx.strokeStyle = this.stamina < 0.2 ? '#e74c3c' : (this.stamina < 0.5 ? '#f39c12' : '#2ecc71');
+                ctx.lineWidth = 2.5;
+                ctx.stroke();
+                
+                // Sprint trail
+                if (this.isSprinting) {
+                    ctx.shadowBlur = 8;
+                    ctx.shadowColor = ctx.strokeStyle;
+                    ctx.stroke();
+                }
+                ctx.restore();
+            }
         }
 
         // ── Puck possession indicator ────────────────────────────────────────
