@@ -2,120 +2,9 @@ import { GameEngine, InputManager } from './engine.js';
 import { Rink, Player, Puck }       from './entities.js';
 import { resolveCircleCollision }   from './physics.js';
 
-// ─── AUDIO ─────────────────────────────────────────────────────────────────────
-class SFX {
-    constructor() {
-        try { this.ctx = new (window.AudioContext || window.webkitAudioContext)(); }
-        catch (e) { this.ctx = null; }
-    }
-    _beep(freq, dur, type = 'sine', gain = 0.3, when = 0) {
-        if (!this.ctx) return;
-        try {
-            const g = this.ctx.createGain();
-            const o = this.ctx.createOscillator();
-            g.gain.setValueAtTime(gain, this.ctx.currentTime + when);
-            g.gain.exponentialRampToValueAtTime(0.0001, this.ctx.currentTime + when + dur);
-            o.frequency.setValueAtTime(freq, this.ctx.currentTime + when);
-            o.type = type;
-            o.connect(g); g.connect(this.ctx.destination);
-            o.start(this.ctx.currentTime + when);
-            o.stop(this.ctx.currentTime + when + dur);
-        } catch (e) {}
-    }
-    _noise(dur, gain = 0.15) {
-        if (!this.ctx) return;
-        try {
-            const buf = this.ctx.createBuffer(1, this.ctx.sampleRate * dur, this.ctx.sampleRate);
-            const d = buf.getChannelData(0);
-            for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
-            const src = this.ctx.createBufferSource(); src.buffer = buf;
-            const g = this.ctx.createGain();
-            g.gain.setValueAtTime(gain, this.ctx.currentTime);
-            g.gain.exponentialRampToValueAtTime(0.0001, this.ctx.currentTime + dur);
-            src.connect(g); g.connect(this.ctx.destination); src.start();
-        } catch (e) {}
-    }
-    resume() { if (this.ctx && this.ctx.state === 'suspended') this.ctx.resume(); }
-    hit(power = 1)   { this._noise(0.06 + power * 0.04, 0.22 + power * 0.12); this._beep(90 + power * 50, 0.1, 'square', 0.15 + power * 0.1); }
-    wristShot()      { this._beep(320, 0.07, 'sawtooth', 0.2); this._noise(0.06, 0.12); }
-    slapShot()       { this._noise(0.18, 0.3); this._beep(160, 0.18, 'sawtooth', 0.25); }
-    pass()           { this._beep(500, 0.05, 'sine', 0.14); }
-    save()           { this._beep(200, 0.2, 'square', 0.28); this._noise(0.12, 0.2); }
-    tackle()         { this._noise(0.14, 0.35); this._beep(75, 0.12, 'square', 0.22); }
-    pickup()         { this._beep(720, 0.04, 'sine', 0.08); }
-    goal() {
-        // Exciting goal horn sequence
-        [523,659,784,1047,1319].forEach((f,i) => this._beep(f, 0.22, 'square', 0.35, i * 0.11));
-        setTimeout(() => {
-            [784,1047].forEach((f,i) => this._beep(f, 0.3, 'square', 0.25, i * 0.15));
-        }, 700);
-    }
-    whistle()        { this._beep(2400, 0.25, 'sine', 0.28); this._beep(2100, 0.15, 'sine', 0.22, 0.28); }
-    tick()           { this._beep(650, 0.03, 'square', 0.08); }
-    charge(t)        { if (!this.ctx) return; this._beep(280 + t * 450, 0.04, 'sine', 0.05 + t * 0.07); }
-    periodEnd()      { [523, 392, 330].forEach((f,i) => this._beep(f, 0.25, 'sine', 0.2, i*0.18)); }
-    buttonPress()    { this._beep(880, 0.03, 'sine', 0.06); }
-    skrape(intensity = 1) { 
-        this._noise(0.04, 0.06 * intensity); 
-        this._beep(250 + Math.random()*150, 0.04, 'sawtooth', 0.03 * intensity);
-    }
-    crowdCheer(dur = 2.0, intensity = 1) {
-        this._noise(dur, 0.08 * intensity);
-    }
-}
-
-// ─── PARTICLES ─────────────────────────────────────────────────────────────────
-class ParticleSystem {
-    constructor() { this.particles = []; }
-    emit(x, y, count, opts = {}) {
-        for (let i = 0; i < count; i++) {
-            const angle = (opts.angle ?? Math.random() * Math.PI * 2) + (Math.random() - 0.5) * (opts.spread ?? Math.PI * 2);
-            const spd = (opts.minSpd || 1) + Math.random() * ((opts.maxSpd || 4) - (opts.minSpd || 1));
-            this.particles.push({
-                x, y,
-                vx: Math.cos(angle) * spd,
-                vy: Math.sin(angle) * spd,
-                life: 1,
-                decay: (opts.minDecay || 0.025) + Math.random() * ((opts.maxDecay || 0.05) - (opts.minDecay || 0.025)),
-                r: (opts.minR || 2) + Math.random() * ((opts.maxR || 3) - (opts.minR || 2)),
-                color: opts.colors ? opts.colors[Math.floor(Math.random() * opts.colors.length)] : '#fff',
-                gravity: opts.gravity || 0,
-                shape: opts.shape || 'circle', // 'circle' | 'star' | 'spark'
-            });
-        }
-    }
-    update() {
-        for (let i = this.particles.length - 1; i >= 0; i--) {
-            const p = this.particles[i];
-            p.x += p.vx; p.y += p.vy;
-            p.vy += p.gravity;
-            p.vx *= 0.94; p.vy *= 0.94;
-            p.life -= p.decay;
-            if (p.life <= 0) this.particles.splice(i, 1);
-        }
-    }
-    render(ctx) {
-        this.particles.forEach(p => {
-            ctx.save();
-            ctx.globalAlpha = Math.max(0, p.life);
-            if (p.shape === 'spark') {
-                ctx.beginPath();
-                ctx.moveTo(p.x, p.y);
-                ctx.lineTo(p.x - p.vx * 4, p.y - p.vy * 4);
-                ctx.strokeStyle = p.color;
-                ctx.lineWidth = p.r * p.life;
-                ctx.lineCap = 'round';
-                ctx.stroke();
-            } else {
-                ctx.beginPath();
-                ctx.arc(p.x, p.y, Math.max(0, p.r * p.life), 0, Math.PI * 2);
-                ctx.fillStyle = p.color;
-                ctx.fill();
-            }
-            ctx.restore();
-        });
-    }
-}
+import { SFX } from './audio.js';
+import { ParticleSystem } from './particles.js';
+import { GameAI } from './ai.js';
 
 // ─── CONSTANTS ─────────────────────────────────────────────────────────────────
 const PERIOD_DURATION = 180; // 3 minutes per period
@@ -171,6 +60,7 @@ class Game {
 
         this.sfx       = new SFX();
         this.particles = new ParticleSystem();
+        this.ai        = new GameAI(this);
 
         // Last scorer name for goal overlay
         this.lastScorerName = '';
@@ -619,7 +509,7 @@ class Game {
         }
 
         // ── 2. AI ─────────────────────────────────────────────────────────────
-        this._updateAI(dt);
+        this.ai.update(dt);
 
         // ── 3. PHYSICS ────────────────────────────────────────────────────────
         this.players.forEach(p => p.update(dt));
@@ -652,139 +542,6 @@ class Game {
             });
         }
         this.particles.update();
-    }
-
-    // ─── AI ─────────────────────────────────────────────────────────────────────
-    _updateAI(dt) {
-        const cx   = this.rink.w / 2;
-        const t0HP = this.players.some(p => p.team === 0 && p.hasPuck);
-        const t1HP = this.players.some(p => p.team === 1 && p.hasPuck);
-        const attackY0 = this.rink.goalLineY0;
-        const attackY1 = this.rink.goalLineY1;
-
-        // Track AI shoot and tackle cooldowns
-        if (!this._aiShootCooldowns) this._aiShootCooldowns = [0,0,0,0,0,0,0,0];
-        if (!this._aiTackleCooldowns) this._aiTackleCooldowns = [0,0,0,0,0,0,0,0];
-        this._aiShootCooldowns = this._aiShootCooldowns.map(c => Math.max(0, c - dt));
-        this._aiTackleCooldowns = this._aiTackleCooldowns.map(c => Math.max(0, c - dt));
-
-        this.players.forEach((p, i) => {
-            if (i === this.controlledIdx) return;
-
-            // ── Goalie AI ──────────────────────────────────────────────────────
-            if (p.isGoalie) {
-                const myLineY = p.team === 0 ? attackY1 : attackY0;
-                const offset  = p.team === 0 ? -38 : 38;
-                const hw = this.rink.goalW * 0.4;
-                const tx = Math.max(cx - hw, Math.min(cx + hw, this.puck.pos.x));
-                // Goalie rushes out when puck is close
-                const dyToPuck = Math.abs(this.puck.pos.y - myLineY);
-                if (dyToPuck < 100) {
-                    p._seek(this.puck.pos.x, this.puck.pos.y);
-                } else {
-                    p._arrive(tx, myLineY + offset, 25);
-                }
-                return;
-            }
-
-            // ── Team 1 (AI opponents) ──────────────────────────────────────────
-            if (p.team === 1) {
-                if (p.hasPuck) {
-                    // Move toward player's goal (bottom = attackY1)
-                    const juke = Math.sin(Date.now() * 0.0015 + i * 1.3) * 35;
-                    const targetX = cx + juke;
-                    p._seek(targetX, attackY1);
-
-                    // Check for passing opportunity
-                    let passed = false;
-                    if (this._aiShootCooldowns[i] <= 0 && Math.random() < 0.03) {
-                        let bestMate = null;
-                        let bestY = p.pos.y;
-                        this.players.forEach(q => {
-                            if (q.team === 1 && q !== p && !q.isGoalie) {
-                                // Is teammate closer to opponent goal? (attackY1 is large Y)
-                                if (q.pos.y > bestY + 40) {
-                                    bestY = q.pos.y;
-                                    bestMate = q;
-                                }
-                            }
-                        });
-                        if (bestMate) {
-                            this._executePass(p, bestMate);
-                            this._aiShootCooldowns[i] = 1.0;
-                            passed = true;
-                        }
-                    }
-
-                    if (!passed) {
-                        // Shoot when in good range - with cooldown to prevent spam
-                        const dyToGoal = attackY1 - p.pos.y;
-                        const distFromCenter = Math.abs(p.pos.x - cx);
-                        const shootProb = dyToGoal < 300 ? (dyToGoal < 150 ? 0.04 : 0.015) : 0;
-                        if (shootProb > 0 && Math.random() < shootProb && this._aiShootCooldowns[i] <= 0) {
-                            // Aim slightly off center for variety
-                            const aimX = cx + (Math.random() - 0.5) * 30;
-                            this._aiShoot(p, aimX, attackY1);
-                            this._aiShootCooldowns[i] = 1.5;
-                        }
-                    }
-                } else if (t1HP) {
-                    // Support: open lane near puck, attack-ready
-                    const side = (i % 2 === 0 ? -1 : 1);
-                    const laneX = cx + side * 110;
-                    const laneY = Math.min(this.puck.pos.y + 20, attackY1 - 80);
-                    p._arrive(laneX, laneY, 70);
-                } else {
-                    // Pressure: chase puck aggressively
-                    const dx = this.puck.pos.x - p.pos.x, dy = this.puck.pos.y - p.pos.y;
-                    const d2 = dx*dx + dy*dy;
-                    if (d2 < 250*250) {
-                        p._seek(this.puck.pos.x, this.puck.pos.y);
-                    } else {
-                        // Fall back to own half if far from puck
-                        const side = (i % 2 === 0 ? -1 : 1);
-                        p._arrive(cx + side * 80, attackY0 + 140, 90);
-                    }
-                }
-            }
-
-            // ── Team 0 non-controlled skaters ─────────────────────────────────
-            else {
-                if (t0HP) {
-                    // Run into open lane, ready for a pass
-                    const side = (i % 2 === 0 ? -1 : 1);
-                    const laneY = attackY0 + 140;
-                    p._arrive(cx + side * 110, laneY, 80);
-                } else {
-                    // Chase puck to support controlled player
-                    const dx = this.puck.pos.x - p.pos.x, dy = this.puck.pos.y - p.pos.y;
-                    const d = Math.sqrt(dx*dx + dy*dy) || 1;
-                    p.applyForce((dx/d) * 0.5, (dy/d) * 0.5);
-                }
-            }
-        });
-    }
-
-    _aiShoot(p, tx, ty) {
-        this.shots[1]++;
-        document.getElementById('shots-away').textContent = this.shots[1];
-        this.sfx.wristShot();
-        const dx = tx - p.pos.x, dy = ty - p.pos.y;
-        const d  = Math.sqrt(dx*dx + dy*dy) || 1;
-        const power = 10 + Math.random() * 5;
-        this.puck.vel.x = p.vel.x * 0.2 + (dx/d) * power;
-        this.puck.vel.y = p.vel.y * 0.2 + (dy/d) * power;
-        this.puck.pos.x = p.pos.x + (dx/d) * (p.radius + this.puck.radius + 4);
-        this.puck.pos.y = p.pos.y + (dy/d) * (p.radius + this.puck.radius + 4);
-        p.hasPuck = false;
-        this.puck.carrier = null;
-
-        // AI shot particles
-        this.particles.emit(p.pos.x, p.pos.y, 8, {
-            colors: ['#c8e8ff','#fff'],
-            angle: Math.atan2(dy, dx) + Math.PI, spread: 0.6,
-            minSpd: 1, maxSpd: 5, minDecay: 0.04, maxDecay: 0.08, shape: 'spark',
-        });
     }
 
     // ─── COLLISIONS ─────────────────────────────────────────────────────────────
