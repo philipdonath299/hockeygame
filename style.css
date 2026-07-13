@@ -6,7 +6,7 @@ html, body {
     width: 100%;
     height: 100%;
     overflow: hidden;
-    background: #0a0a16;
+    background: #050a14;
     font-family: 'Oswald', 'Arial Narrow', sans-serif;
     touch-action: none;
     overscroll-behavior: none;
@@ -35,90 +35,129 @@ html, body {
     position: absolute;
     top: 0; left: 0; right: 0;
     display: flex;
-    align-items: stretch;
+    align-items: center;
     justify-content: space-between;
-    height: 58px;
-    padding: 0 10px;
-    background: linear-gradient(180deg, rgba(0,0,0,0.82) 70%, transparent);
+    height: 64px;
+    padding: 0 6px;
+    background: linear-gradient(180deg,
+        rgba(4,10,22,0.96) 0%,
+        rgba(4,10,22,0.85) 75%,
+        transparent 100%);
     pointer-events: all;
+    border-bottom: 1px solid rgba(255,255,255,0.06);
 }
 
-.team-container {
+/* ── Team panel (left/right) ── */
+.team-panel {
     display: flex;
-    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    min-width: 110px;
+}
+.team-panel.right { flex-direction: row-reverse; }
+
+.team-logo-badge {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    display: flex;
     align-items: center;
     justify-content: center;
-    min-width: 80px;
-    gap: 1px;
+    font-size: 18px;
+    font-weight: 900;
+    flex-shrink: 0;
+    border: 2px solid rgba(255,255,255,0.15);
+    box-shadow: 0 0 12px rgba(0,0,0,0.6);
 }
 
-.team-name {
+.team-logo-badge.red  { background: radial-gradient(circle at 35% 35%, #e74c3c, #8B0000); }
+.team-logo-badge.blue { background: radial-gradient(circle at 35% 35%, #3498db, #0a2f4e); }
+
+.team-info {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 1px;
+}
+.team-panel.right .team-info { align-items: flex-end; }
+
+.team-abbr {
     font-size: 10px;
     font-weight: 700;
     letter-spacing: 2px;
-    color: rgba(255,255,255,0.55);
+    color: rgba(255,255,255,0.5);
     text-transform: uppercase;
+    line-height: 1;
 }
 
 .team-score {
-    font-size: 32px;
+    font-size: 30px;
     font-weight: 900;
     line-height: 1;
     letter-spacing: -1px;
 }
 
-.team-red  .team-score { color: #e74c3c; text-shadow: 0 0 16px rgba(231,76,60,0.8); }
-.team-blue .team-score { color: #3498db; text-shadow: 0 0 16px rgba(52,152,219,0.8); }
+.team-red  .team-score { color: #ff4d4d; text-shadow: 0 0 20px rgba(231,76,60,0.9); }
+.team-blue .team-score { color: #4db8ff; text-shadow: 0 0 20px rgba(52,152,219,0.9); }
 
 .shots {
     display: flex;
-    gap: 4px;
-    font-size: 9px;
-    color: rgba(255,255,255,0.4);
+    gap: 3px;
+    font-size: 8px;
+    color: rgba(255,255,255,0.35);
     letter-spacing: 0.5px;
+    line-height: 1;
 }
 
-/* ── Center clock ── */
-.time-container {
+/* ── Center clock block ── */
+.time-block {
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    gap: 1px;
+    background: rgba(255,255,255,0.05);
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 10px;
+    padding: 4px 14px 5px;
+    min-width: 90px;
+    gap: 0;
 }
 
 .clock {
-    font-size: 20px;
-    font-weight: 700;
+    font-size: 22px;
+    font-weight: 900;
     color: #fff;
-    letter-spacing: 2px;
+    letter-spacing: 3px;
     font-variant-numeric: tabular-nums;
+    line-height: 1.1;
 }
 
 .period {
-    font-size: 9px;
-    color: rgba(255,255,255,0.45);
-    letter-spacing: 2px;
+    font-size: 8px;
+    color: rgba(255,200,0,0.8);
+    letter-spacing: 3px;
     text-transform: uppercase;
+    font-weight: 700;
 }
 
 /* ── Pause button ── */
 .pause-btn {
     position: absolute;
-    right: 8px;
+    right: 6px;
     top: 50%;
     transform: translateY(-50%);
     display: flex;
     gap: 3px;
-    padding: 8px 6px;
+    padding: 10px 7px;
     cursor: pointer;
     pointer-events: all;
+    border-radius: 6px;
 }
 
 .bar {
-    width: 4px;
-    height: 16px;
-    background: rgba(255,255,255,0.65);
+    width: 3px;
+    height: 14px;
+    background: rgba(255,255,255,0.55);
     border-radius: 2px;
 }
 
@@ -130,27 +169,134 @@ html, body {
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    background: rgba(0,0,0,0.48);
-    backdrop-filter: blur(3px);
-    -webkit-backdrop-filter: blur(3px);
+    background: rgba(0,0,0,0.55);
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
     pointer-events: none;
-    transition: opacity 0.25s;
+    transition: opacity 0.3s;
 }
 
 #goal-overlay.hidden { display: none; }
 
+.goal-banner {
+    background: linear-gradient(135deg, rgba(255,255,255,0.08), rgba(255,255,255,0.02));
+    border: 1px solid rgba(255,255,255,0.12);
+    border-radius: 20px;
+    padding: 24px 40px 20px;
+    text-align: center;
+    box-shadow: 0 8px 40px rgba(0,0,0,0.6);
+    backdrop-filter: blur(10px);
+}
+
 .goal-text {
-    font-size: 52px;
+    font-size: 54px;
     font-weight: 900;
     color: #fff;
-    text-shadow: 0 0 40px currentColor, 0 2px 0 rgba(0,0,0,0.5);
+    text-shadow: 0 0 50px currentColor, 0 2px 0 rgba(0,0,0,0.5);
     letter-spacing: 3px;
-    animation: goalPulse 0.55s ease-in-out infinite alternate;
+    animation: goalPulse 0.5s ease-in-out infinite alternate;
     text-align: center;
-    padding: 0 20px;
+    line-height: 1.05;
+}
+
+.goal-scorer {
+    font-size: 13px;
+    color: rgba(255,255,255,0.55);
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    margin-top: 10px;
+    font-weight: 400;
 }
 
 @keyframes goalPulse {
     from { transform: scale(1);    opacity: 1; }
-    to   { transform: scale(1.07); opacity: 0.88; }
+    to   { transform: scale(1.06); opacity: 0.9; }
+}
+
+/* ── Period transition banner ── */
+#period-banner {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%) scale(0.8);
+    background: linear-gradient(135deg, rgba(20,30,50,0.95), rgba(10,20,40,0.95));
+    border: 1px solid rgba(255,200,0,0.3);
+    border-radius: 16px;
+    padding: 18px 36px;
+    text-align: center;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.3s, transform 0.3s;
+}
+#period-banner.show {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1);
+}
+#period-banner .pb-label {
+    font-size: 11px;
+    letter-spacing: 4px;
+    color: rgba(255,200,0,0.8);
+    font-weight: 700;
+    text-transform: uppercase;
+}
+#period-banner .pb-value {
+    font-size: 38px;
+    font-weight: 900;
+    color: #fff;
+    letter-spacing: 2px;
+    line-height: 1.1;
+}
+
+/* ── Action buttons (right side) ── */
+#action-buttons {
+    position: absolute;
+    right: 14px;
+    bottom: 80px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    pointer-events: all;
+    align-items: center;
+}
+
+.action-btn {
+    width: 52px;
+    height: 52px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 11px;
+    font-weight: 900;
+    letter-spacing: 0.5px;
+    color: #fff;
+    border: none;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.5);
+    text-transform: uppercase;
+    transition: transform 0.08s, box-shadow 0.08s;
+    font-family: 'Oswald', sans-serif;
+    text-align: center;
+    line-height: 1.1;
+}
+
+.action-btn:active { transform: scale(0.92); box-shadow: 0 2px 8px rgba(0,0,0,0.5); }
+
+#btn-shoot {
+    background: radial-gradient(circle at 40% 35%, #e74c3c, #8B0000);
+    border: 2px solid rgba(255,100,100,0.4);
+    width: 60px;
+    height: 60px;
+    font-size: 10px;
+}
+
+#btn-pass {
+    background: radial-gradient(circle at 40% 35%, #3498db, #0a4880);
+    border: 2px solid rgba(52,152,219,0.4);
+}
+
+#btn-hit {
+    background: radial-gradient(circle at 40% 35%, #f39c12, #7d5100);
+    border: 2px solid rgba(243,156,18,0.4);
 }

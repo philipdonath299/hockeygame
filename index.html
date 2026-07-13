@@ -5,11 +5,11 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <meta name="description" content="Arcade Hockey – fast mobile hockey game">
-    <title>Arcade Hockey</title>
+    <meta name="description" content="Superstar Hockey – fast-paced mobile arcade hockey">
+    <title>Superstar Hockey</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Oswald:wght@400;700;900&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Oswald:wght@400;600;700;900&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -17,44 +17,72 @@
 <canvas id="game-canvas"></canvas>
 
 <div id="ui-layer">
+    <!-- Scoreboard -->
     <div id="scoreboard">
-        <div class="team-container team-red">
-            <span class="team-name">YOU</span>
-            <span class="team-score" id="score-home">0</span>
-            <div class="shots">
-                <span>SOG</span>
-                <span id="shots-home">0</span>
+        <!-- Home team -->
+        <div class="team-panel team-red" id="team-home-panel">
+            <div class="team-logo-badge red" id="home-badge">🦅</div>
+            <div class="team-info">
+                <span class="team-abbr" id="home-abbr">YOU</span>
+                <span class="team-score" id="score-home">0</span>
+                <div class="shots">
+                    <span>SOG</span>
+                    <span id="shots-home">0</span>
+                </div>
             </div>
         </div>
 
-        <div class="time-container">
-            <span class="clock" id="clock">5:00</span>
+        <!-- Center clock -->
+        <div class="time-block">
+            <span class="clock" id="clock">3:00</span>
             <span class="period" id="period">1ST</span>
         </div>
 
-        <div class="team-container team-blue">
-            <div class="shots">
-                <span>SOG</span>
-                <span id="shots-away">0</span>
+        <!-- Away team -->
+        <div class="team-panel right team-blue" id="team-away-panel">
+            <div class="team-logo-badge blue" id="away-badge">🐺</div>
+            <div class="team-info">
+                <span class="team-abbr" id="away-abbr">OPP</span>
+                <span class="team-score" id="score-away">0</span>
+                <div class="shots">
+                    <span>SOG</span>
+                    <span id="shots-away">0</span>
+                </div>
             </div>
-            <span class="team-score" id="score-away">0</span>
-            <span class="team-name">OPP</span>
         </div>
 
+        <!-- Pause button -->
         <div class="pause-btn" id="pause-btn">
             <div class="bar"></div>
             <div class="bar"></div>
         </div>
     </div>
 
+    <!-- Goal / Gameover overlay -->
     <div id="goal-overlay" class="hidden">
-        <div class="goal-text">GOAL!</div>
+        <div class="goal-banner">
+            <div class="goal-text">GOAL!</div>
+            <div class="goal-scorer" id="goal-scorer"></div>
+        </div>
+    </div>
+
+    <!-- Period transition banner -->
+    <div id="period-banner">
+        <div class="pb-label">Period</div>
+        <div class="pb-value" id="pb-value">2ND</div>
+    </div>
+
+    <!-- Action buttons (right side - Superstar Hockey style) -->
+    <div id="action-buttons">
+        <button class="action-btn" id="btn-shoot">SHOOT</button>
+        <button class="action-btn" id="btn-pass">PASS</button>
+        <button class="action-btn" id="btn-hit">HIT</button>
     </div>
 </div>
 
 <script type="module" src="main.js"></script>
 
-<!-- On-screen error reporter (dev helper, harmless in prod) -->
+<!-- Dev error reporter -->
 <script>
 window.onerror = function(msg, url, ln, col) {
     const d = document.createElement('div');

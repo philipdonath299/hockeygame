@@ -46,7 +46,7 @@ export class InputManager {
             dx: 0, dy: 0,
             vx: 0, vy: 0,
             mag: 0,
-            MAX_R: 55,
+            MAX_R: 58,
         };
 
         this.onRelease = null;
@@ -56,6 +56,12 @@ export class InputManager {
         canvas.addEventListener('touchmove',   e => this._onMove(e),  opts);
         canvas.addEventListener('touchend',    e => this._onEnd(e),   opts);
         canvas.addEventListener('touchcancel', e => this._onEnd(e),   opts);
+
+        // Mouse support for desktop testing
+        canvas.addEventListener('mousedown',  e => this._onMouseStart(e));
+        canvas.addEventListener('mousemove',  e => this._onMouseMove(e));
+        canvas.addEventListener('mouseup',    e => this._onMouseEnd(e));
+        canvas.addEventListener('mouseleave', e => this._onMouseEnd(e));
     }
 
     _pt(touch) {
@@ -66,14 +72,22 @@ export class InputManager {
         };
     }
 
+    _isRightZone(clientX) {
+        const r = this.canvas.getBoundingClientRect();
+        // Joystick only allowed on left 65% of screen
+        return (clientX - r.left) > r.width * 0.65;
+    }
+
     _onStart(e) {
         e.preventDefault();
         for (const t of e.changedTouches) {
-            const r = this.canvas.getBoundingClientRect();
-            if (t.clientX - r.left > r.width * 0.65) continue;
+            if (this._isRightZone(t.clientX)) continue;
             if (this.joystick.active) continue;
             const p = this._pt(t);
-            Object.assign(this.joystick, { active: true, touchId: t.identifier, originX: p.x, originY: p.y });
+            Object.assign(this.joystick, {
+                active: true, touchId: t.identifier,
+                originX: p.x, originY: p.y
+            });
             this._update(p.x, p.y);
         }
     }
@@ -94,8 +108,40 @@ export class InputManager {
             if (this.onRelease && this.joystick.mag > 0.1) {
                 this.onRelease(this.joystick.vx, this.joystick.vy, this.joystick.mag);
             }
-            Object.assign(this.joystick, { active: false, touchId: null, dx: 0, dy: 0, vx: 0, vy: 0, mag: 0 });
+            Object.assign(this.joystick, {
+                active: false, touchId: null,
+                dx: 0, dy: 0, vx: 0, vy: 0, mag: 0
+            });
         }
+    }
+
+    // Mouse support
+    _onMouseStart(e) {
+        if (this._isRightZone(e.clientX)) return;
+        if (this.joystick.active) return;
+        const p = this._pt(e);
+        Object.assign(this.joystick, {
+            active: true, touchId: 'mouse',
+            originX: p.x, originY: p.y
+        });
+        this._update(p.x, p.y);
+    }
+
+    _onMouseMove(e) {
+        if (this.joystick.touchId !== 'mouse') return;
+        const p = this._pt(e);
+        this._update(p.x, p.y);
+    }
+
+    _onMouseEnd(e) {
+        if (this.joystick.touchId !== 'mouse') return;
+        if (this.onRelease && this.joystick.mag > 0.1) {
+            this.onRelease(this.joystick.vx, this.joystick.vy, this.joystick.mag);
+        }
+        Object.assign(this.joystick, {
+            active: false, touchId: null,
+            dx: 0, dy: 0, vx: 0, vy: 0, mag: 0
+        });
     }
 
     _update(x, y) {
@@ -117,22 +163,22 @@ export class InputManager {
 
         ctx.save();
 
-        // Outer base ring
+        // Outer base ring with subtle glow
         ctx.beginPath();
         ctx.arc(ox, oy, js.MAX_R, 0, Math.PI * 2);
-        ctx.fillStyle = 'rgba(255,255,255,0.07)';
+        ctx.fillStyle = 'rgba(255,255,255,0.05)';
         ctx.fill();
-        ctx.strokeStyle = 'rgba(255,255,255,0.25)';
+        ctx.strokeStyle = 'rgba(255,255,255,0.22)';
         ctx.lineWidth = 2;
         ctx.stroke();
 
-        // Inner tick marks (like a compass)
+        // Compass tick marks
         for (let a = 0; a < Math.PI * 2; a += Math.PI / 4) {
             const cos = Math.cos(a), sin = Math.sin(a);
             ctx.beginPath();
             ctx.moveTo(ox + cos * (js.MAX_R - 10), oy + sin * (js.MAX_R - 10));
             ctx.lineTo(ox + cos * js.MAX_R, oy + sin * js.MAX_R);
-            ctx.strokeStyle = 'rgba(255,255,255,0.35)';
+            ctx.strokeStyle = 'rgba(255,255,255,0.3)';
             ctx.lineWidth = 2;
             ctx.stroke();
         }
@@ -141,30 +187,35 @@ export class InputManager {
         ctx.beginPath();
         ctx.moveTo(ox, oy);
         ctx.lineTo(nx, ny);
-        ctx.strokeStyle = 'rgba(255,255,255,0.2)';
+        ctx.strokeStyle = 'rgba(255,255,255,0.18)';
         ctx.lineWidth = 1.5;
         ctx.stroke();
 
-        // Nub gradient
-        const g = ctx.createRadialGradient(nx - 8, ny - 8, 2, nx, ny, 30);
+        // Nub (stick)
+        const nubR = 28;
+        const g = ctx.createRadialGradient(nx - 8, ny - 8, 2, nx, ny, nubR);
         g.addColorStop(0, 'rgba(255,255,255,0.95)');
-        g.addColorStop(0.4, 'rgba(200,200,220,0.75)');
-        g.addColorStop(1, 'rgba(100,100,130,0.55)');
+        g.addColorStop(0.35, 'rgba(200,210,235,0.80)');
+        g.addColorStop(1, 'rgba(100,120,160,0.55)');
         ctx.beginPath();
-        ctx.arc(nx, ny, 30, 0, Math.PI * 2);
+        ctx.arc(nx, ny, nubR, 0, Math.PI * 2);
         ctx.fillStyle = g;
         ctx.fill();
         ctx.strokeStyle = 'rgba(255,255,255,0.4)';
         ctx.lineWidth = 2;
         ctx.stroke();
 
-        // Magnitude indicator ring on nub
+        // Magnitude arc on nub
         if (js.mag > 0.15) {
             ctx.beginPath();
-            ctx.arc(nx, ny, 30, -Math.PI / 2, -Math.PI / 2 + js.mag * Math.PI * 2);
-            ctx.strokeStyle = js.mag > 0.8 ? '#e74c3c' : '#2ecc71';
+            ctx.arc(nx, ny, nubR, -Math.PI / 2, -Math.PI / 2 + js.mag * Math.PI * 2);
+            const arcColor = js.mag > 0.85 ? '#e74c3c' : js.mag > 0.5 ? '#f39c12' : '#2ecc71';
+            ctx.strokeStyle = arcColor;
             ctx.lineWidth = 3;
+            ctx.shadowBlur = 8;
+            ctx.shadowColor = arcColor;
             ctx.stroke();
+            ctx.shadowBlur = 0;
         }
 
         ctx.restore();
