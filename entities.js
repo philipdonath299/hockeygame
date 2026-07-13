@@ -120,17 +120,31 @@ const PLAYER_NAMES = [
 ];
 
 export class Player {
-    constructor(x, y, team, number, isGoalie = false, teamConfig = null) {
+    constructor(x, y, team, number, isGoalie = false, teamConfig = null, role = 'CENTER') {
         this.pos      = { x, y };
         this.vel      = { x: 0, y: 0 };
         this.radius   = isGoalie ? 15 : 13;
-        this.mass     = isGoalie ? 3.2 : 2;
+        
+        // Base stats by role
+        this.mass     = isGoalie ? 3.2 : 2.0;
+        this.maxSpeed = isGoalie ? 4.8 : 8.0;
+        
+        if (!isGoalie) {
+            if (role === 'LW') {
+                this.mass = 1.6;     // Light & fast (Sniper)
+                this.maxSpeed = 8.6; 
+            } else if (role === 'RW') {
+                this.mass = 2.5;     // Heavy & slow (Enforcer)
+                this.maxSpeed = 7.4; 
+            }
+        }
+        
         this.team     = team;
         this.number   = number;
         this.isGoalie = isGoalie;
+        this.role     = role;
         this.hasPuck  = false;
         this.stunTimer = 0;
-        this.maxSpeed = isGoalie ? 4.8 : 8.0;
         this.friction = 0.77;
         this.angle    = team === 0 ? -Math.PI / 2 : Math.PI / 2;
         this.tackleFrames = 0;

@@ -285,15 +285,15 @@ class Game {
         const cx = this.rink.w / 2, cy = this.rink.h / 2;
 
         // Team 0 (red, human) — attacks top goal (goalLineY0)
-        this.players.push(new Player(cx,       cy + 55,  0, 99, false, TEAMS[0]));       // center  → i=0
-        this.players.push(new Player(cx - 110, cy + 130, 0, 8,  false, TEAMS[0]));       // LW      → i=1
-        this.players.push(new Player(cx + 110, cy + 130, 0, 19, false, TEAMS[0]));       // RW      → i=2
+        this.players.push(new Player(cx,       cy + 55,  0, 99, false, TEAMS[0], 'CENTER')); // center  → i=0
+        this.players.push(new Player(cx - 110, cy + 130, 0, 8,  false, TEAMS[0], 'LW'));     // LW      → i=1
+        this.players.push(new Player(cx + 110, cy + 130, 0, 19, false, TEAMS[0], 'RW'));     // RW      → i=2
         this.players.push(new Player(cx, this.rink.goalLineY1 - 45, 0, 31, true, TEAMS[0])); // GK → i=3
 
         // Team 1 (blue, AI) — attacks bottom goal (goalLineY1)
-        this.players.push(new Player(cx,       cy - 55,  1, 87, false, TEAMS[1]));       // center  → i=4
-        this.players.push(new Player(cx - 110, cy - 130, 1, 71, false, TEAMS[1]));       // LW      → i=5
-        this.players.push(new Player(cx + 110, cy - 130, 1, 58, false, TEAMS[1]));       // RW      → i=6
+        this.players.push(new Player(cx,       cy - 55,  1, 87, false, TEAMS[1], 'CENTER')); // center  → i=4
+        this.players.push(new Player(cx - 110, cy - 130, 1, 71, false, TEAMS[1], 'LW'));     // LW      → i=5
+        this.players.push(new Player(cx + 110, cy - 130, 1, 58, false, TEAMS[1], 'RW'));     // RW      → i=6
         this.players.push(new Player(cx, this.rink.goalLineY0 + 45, 1, 30, true, TEAMS[1])); // GK → i=7
 
         this._resetPositions();
@@ -644,6 +644,13 @@ class Game {
         if (this.switchTimer <= 0) { this.switchTimer = SWITCH_INTERVAL; this._autoSwitch(); }
 
         // ── 9. PARTICLES ──────────────────────────────────────────────────────
+        const puckSpd = Math.sqrt(this.puck.vel.x**2 + this.puck.vel.y**2);
+        if (puckSpd > 14.0 && Math.random() < 0.8) {
+            this.particles.emit(this.puck.pos.x, this.puck.pos.y, 1, {
+                colors: ['#ff4500','#ff8c00','#ffd700', '#fff'],
+                minSpd: 0.1, maxSpd: 1.5, minDecay: 0.05, maxDecay: 0.1, shape: 'spark'
+            });
+        }
         this.particles.update();
     }
 
