@@ -156,16 +156,53 @@ class Game {
             });
         };
 
-        handleBtn(btnShoot, () => {
+        this.shootCharging = false;
+        this.shootChargeTimer = 0;
+
+        btnShoot.addEventListener('pointerdown', e => {
+            e.stopPropagation();
+            this.sfx.resume();
+            if (this.gameState !== 'PLAYING') return;
             const cp = this.players[this.controlledIdx];
             if (!cp || !cp.hasPuck) return;
-            // Auto-aim shoot toward opponent goal
-            const goalY = this.rink.goalLineY0; // team0 attacks top
-            const goalX = this.rink.w / 2;
-            const dx = goalX - cp.pos.x, dy = goalY - cp.pos.y;
-            const d = Math.sqrt(dx*dx+dy*dy) || 1;
-            this._executeShot(cp, dx/d, dy/d, WRIST_POWER + 2);
+
+            this.shootCharging = true;
+            this.shootChargeTimer = 0;
+            this.sfx.buttonPress();
         });
+
+        const releaseShoot = (e) => {
+            if (!this.shootCharging) return;
+            this.shootCharging = false;
+            const cp = this.players[this.controlledIdx];
+            if (!cp || !cp.hasPuck) return;
+
+            const goalY = this.rink.goalLineY0;
+            const goalX = this.rink.w / 2;
+            
+            // Use joystick direction if active, otherwise auto-aim
+            let dx, dy;
+            if (this.input.joystick.active && this.input.joystick.mag > 0.2) {
+                dx = this.input.joystick.vx;
+                dy = this.input.joystick.vy;
+            } else {
+                dx = goalX - cp.pos.x;
+                dy = goalY - cp.pos.y;
+            }
+
+            const d = Math.sqrt(dx*dx+dy*dy) || 1;
+            dx /= d; dy /= d;
+
+            const basePower = WRIST_POWER + 2;
+            const maxBonus = 12;
+            const bonus = Math.min(this.shootChargeTimer * maxBonus, maxBonus); // max charge in 1s
+            const power = basePower + bonus;
+            
+            this._executeShot(cp, dx, dy, power);
+        };
+
+        btnShoot.addEventListener('pointerup', releaseShoot);
+        btnShoot.addEventListener('pointerleave', releaseShoot);
 
         handleBtn(btnPass, () => {
             const cp = this.players[this.controlledIdx];
@@ -184,7 +221,29 @@ class Game {
 
         handleBtn(btnHit, () => {
             const cp = this.players[this.controlledIdx];
-            if (!cp || cp.hasPuck || this.tackleTimer > 0) return;
+            if (!cp) return;
+            
+            // Deke mechanic if holding puck
+            if (cp.hasPuck) {
+                if (cp.stamina < 0.25) return;
+                cp.stamina -= 0.25;
+                cp.dekeTimer = 0.5; // Invulnerable for 0.5s
+                
+                const spd = Math.sqrt(cp.vel.x**2 + cp.vel.y**2) || 1;
+                cp.vel.x = (cp.vel.x/spd) * cp.maxSpeed * 1.5;
+                cp.vel.y = (cp.vel.y/spd) * cp.maxSpeed * 1.5;
+                
+                this.sfx.skrape(1.0);
+                this.particles.emit(cp.pos.x, cp.pos.y, 10, {
+                    colors: ['#3498db', '#f1c40f', '#fff'],
+                    angle: Math.random() * Math.PI*2, spread: Math.PI*2,
+                    minSpd: 2, maxSpd: 6, shape: 'spark'
+                });
+                return;
+            }
+
+            if (this.tackleTimer > 0) return;
+            
             // Find closest opponent
             let target = null, bestDist = 200;
             this.players.forEach(q => {
@@ -377,6 +436,10 @@ class Game {
         const charged = power > WRIST_POWER + 2;
         charged ? this.sfx.slapShot() : this.sfx.wristShot();
 
+        if (charged) {
+            this.shake.power = Math.min(25, (power - WRIST_POWER) * 2);
+        }
+
         this.puck.vel.x = cp.vel.x * 0.3 + vx * power;
         this.puck.vel.y = cp.vel.y * 0.3 + vy * power;
         this.puck.pos.x = cp.pos.x + vx * (cp.radius + this.puck.radius + 4);
@@ -391,6 +454,15 @@ class Game {
             minSpd: charged ? 3 : 1.5, maxSpd: charged ? 10 : 6,
             minDecay: 0.03, maxDecay: 0.07, shape: 'spark',
         });
+        
+        if (charged && power > WRIST_POWER + 6) {
+            // Extra fire effect for fully charged slapshot
+            this.particles.emit(cp.pos.x, cp.pos.y, 15, {
+                colors: ['#ff7675','#e74c3c','#f1c40f'],
+                angle: shotAngle + Math.PI, spread: 0.5,
+                minSpd: 2, maxSpd: 12, minDecay: 0.02, maxDecay: 0.05, shape: 'spark'
+            });
+        }
     }
 
     _executePass(cp, target) {
@@ -531,7 +603,19 @@ class Game {
 
                 if (cp.hasPuck) {
                     this.joystickHeld += dt;
-                    if (this.joystickHeld > 0.4 && Math.random() < 0.35) {
+                    
+                    if (this.shootCharging) {
+                        this.shootChargeTimer += dt;
+                        
+                        // Show charge particles on the puck
+                        if (Math.random() < 0.4) {
+                            this.particles.emit(this.puck.pos.x, this.puck.pos.y, 2, {
+                                colors: ['#ffe500','#ff8800'],
+                                minSpd: 0.5, maxSpd: 3, minDecay: 0.06, maxDecay: 0.12,
+                            });
+                        }
+                    } else if (this.joystickHeld > 0.4 && Math.random() < 0.35) {
+                        // Original touch-swipe charge effect
                         this.sfx.charge(Math.min((this.joystickHeld - 0.4) / 0.4, 1));
                         this.particles.emit(this.puck.pos.x, this.puck.pos.y, 2, {
                             colors: ['#ffe500','#ff8800'],
@@ -607,13 +691,13 @@ class Game {
                     const aChecking = a.tackleFrames > 0;
                     const bChecking = b.tackleFrames > 0;
 
-                    if (b.hasPuck && (aChecking || spdA > CHECK_THRESHOLD)) {
+                    if (b.hasPuck && (aChecking || spdA > CHECK_THRESHOLD) && b.dekeTimer <= 0) {
                         const canTackle = a.team === 0 || this._aiTackleCooldowns[this.players.indexOf(a)] === 0;
                         if (canTackle) {
                             this._dislodge(b, a);
                             if (a.team === 1) this._aiTackleCooldowns[this.players.indexOf(a)] = 2.0; // AI cooldown
                         }
-                    } else if (a.hasPuck && (bChecking || spdB > CHECK_THRESHOLD)) {
+                    } else if (a.hasPuck && (bChecking || spdB > CHECK_THRESHOLD) && a.dekeTimer <= 0) {
                         const canTackle = b.team === 0 || this._aiTackleCooldowns[this.players.indexOf(b)] === 0;
                         if (canTackle) {
                             this._dislodge(a, b);
@@ -773,7 +857,7 @@ class Game {
             const lineLen = 170;
             const ax = this.puck.pos.x + vx * lineLen, ay = this.puck.pos.y + vy * lineLen;
             const isPass = !!this.passTarget;
-            const charged = this.joystickHeld > 0.4;
+            const charged = this.shootCharging || this.joystickHeld > 0.4;
 
             ctx.save();
             const aimColor = isPass ? '#3498db' : (charged ? '#ff6600' : '#00e5b0');
@@ -799,7 +883,10 @@ class Game {
 
             // Shot power arc
             if (charged && !isPass) {
-                const chargeT = Math.min((this.joystickHeld - 0.4) / 0.5, 1);
+                let chargeT = 0;
+                if (this.shootCharging) chargeT = Math.min(this.shootChargeTimer / 1.0, 1);
+                else chargeT = Math.min((this.joystickHeld - 0.4) / 0.5, 1);
+                
                 ctx.beginPath();
                 ctx.arc(this.puck.pos.x, this.puck.pos.y, 15, -Math.PI/2, -Math.PI/2 + chargeT * Math.PI * 2);
                 ctx.strokeStyle = chargeT > 0.8 ? '#ff2222' : '#ff6600';

@@ -151,6 +151,7 @@ export class Player {
 
         this.skatePhase  = Math.random() * Math.PI * 2;
         this.hitFlash    = 0;
+        this.dekeTimer   = 0;
         this.puckGlow    = 0; // glow when picking up puck
         this.stamina     = 1.0;
         this.isSprinting = false;
@@ -188,6 +189,7 @@ export class Player {
     update(dt) {
         if (this.stunTimer > 0) this.stunTimer -= dt;
         if (this.hitFlash  > 0) this.hitFlash  -= dt;
+        if (this.dekeTimer > 0) this.dekeTimer -= dt;
         if (this.tackleFrames > 0) this.tackleFrames--;
         if (this.puckGlow > 0) this.puckGlow -= dt * 2;
 
@@ -239,6 +241,10 @@ export class Player {
 
         ctx.save();
         ctx.translate(this.pos.x, this.pos.y);
+
+        if (this.dekeTimer > 0) {
+            ctx.rotate(this.dekeTimer * 20); // Spin rapidly when deking
+        }
 
         // ── Skate trails (ice cuts) ──────────────────────────────────────────
         if (spd > 1.2) {
